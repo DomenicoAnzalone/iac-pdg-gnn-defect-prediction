@@ -1,38 +1,36 @@
-FROM ubuntu:20.04
+FROM python:3.12
 
+RUN apt-get update && apt-get install -y \
+    git \
+    graphviz
 
-# Install python
-RUN apt-get update \
-  && apt-get install -y python3-pip python3-dev \
-  && cd /usr/local/bin \
-  && ln -s /usr/bin/python3 python \
-  && pip3 install --upgrade pip
+RUN pip install "ansible-core==2.15.12"
 
-# Install Poetry
-RUN pip install poetry
+RUN pip install \
+    click \
+    attrs \
+    attrs-strict \
+    graphviz \
+    jinja2 \
+    kuzu \
+    loguru \
+    pydantic \
+    requests \
+    rich \
+    rustworkx
 
-# Install git
-RUN apt-get install git -y
+RUN git clone https://github.com/softwarelanguageslab/scansible.git /scansible
 
-# Clone and install Tool 1
-RUN git clone git@gitlab.soft.vub.ac.be:ropdebee/scansible.git /scansible \
-    && poetry install -r /scansible/
+WORKDIR /scansible
 
-# Installa networkx
-RUN pip install networkx
+RUN pip install --no-deps .
 
-# Installa PyYAML
-RUN pip install PyYAML
+RUN pip install \
+    networkx \
+    PyYAML \
+    matplotlib \
+    pandas \
+    gitpython \
+    pydot
 
-# Installa matplotlib
-RUN pip install matplotlib
-
-# Installa pandas
-RUN pip install pandas
-
-# Installa gitpython
-RUN pip install gitpython
-
-COPY . .
-
-CMD ["python", "main.py"]
+WORKDIR /app

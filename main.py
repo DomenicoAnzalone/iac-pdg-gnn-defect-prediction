@@ -1,8 +1,6 @@
 import extractPdgTaskLevel as pdgTL
 import extractPdgRepositoryLevel as pdgRL
-import extract_file_metrics as pdgFM
 import project_pdg_info as info
-import save_file_metrics as metric
 import change_commit as do
 import clean as cleaner
 import traceback
@@ -44,26 +42,18 @@ def main():
                     print("STEP 1: FAIL")
                     isPDGextracted = False
 
-                if( isCheckout and isPDGextracted ):
+                if(isCheckout and isPDGextracted):
                     print("STEP 2: PASS")
 
-                    # estraggo i pdg a livello di task
-                    pdgTL.extract_pdg_task_level_from_repo(repository = repository)
+                    # estraggo i PDG task-level
+                    pdgTL.extract_pdg_task_level_from_repo(repository=repository)
+
                     print("STEP 3: PASS")
-                    
-                    # estraggo le metriche
-                    list_file_metrics = pdgFM.extract_file_metrics_from_repo(repository = repository)
-                    print("STEP 4: PASS")
-                    
-                    # salvo le metriche    
-                    metric.save(list_dict_metric = list_file_metrics)
-                    print("STEP 5: PASS")
-                else: 
+
+                else:
                     print("STEP 2: FAIL")
     except:
-        traceback.print_exc()
-        
-                
+        traceback.print_exc()                
 
 if __name__ == "__main__":
     main()
