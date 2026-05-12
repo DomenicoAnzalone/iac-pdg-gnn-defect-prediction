@@ -1,4 +1,5 @@
 /output/
 /input/repositories/
-/__pycache__/
+__pycache__/
 /.vscode/
+gnn/data/
