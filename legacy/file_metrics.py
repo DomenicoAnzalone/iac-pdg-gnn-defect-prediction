@@ -1,4 +1,4 @@
-import task_metrics as tm
+import legacy.task_metrics as tm
 import json
 import os
 import yaml

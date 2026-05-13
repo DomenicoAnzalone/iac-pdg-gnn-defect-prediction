@@ -2,7 +2,7 @@ import extractPdgTaskLevel as pdgTL
 import extractPdgRepositoryLevel as pdgRL
 import project_pdg_info as info
 import change_commit as do
-import clean as cleaner
+import scripts.clean as cleaner
 import traceback
 
 def main():

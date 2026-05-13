@@ -1,5 +1,5 @@
-import task_metrics as mt
-import file_metrics as mf
+import legacy.task_metrics as mt
+import legacy.file_metrics as mf
 import writer_reader as wr
 import networkx as nx
 import get_file_path as fp
