@@ -1,6 +1,0 @@
-,naive_bayes,logistic,svc,decision_tree,random_forest
-naive_bayes,,False,False,False,False
-logistic,,,True,True,True
-svc,,,,True,False
-decision_tree,,,,,False
-random_forest,,,,,

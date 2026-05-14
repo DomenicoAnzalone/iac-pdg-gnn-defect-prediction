@@ -1,0 +1,15 @@
+.git
+__pycache__
+*.pyc
+
+output/
+input/
+legacy/
+data/
+
+venv/
+.env
+
+*.graphml
+*.dot
+*.json
