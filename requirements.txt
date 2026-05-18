@@ -1,5 +1,6 @@
 networkx
 lxml
+torch
 torch-geometric
 numpy
 pandas
