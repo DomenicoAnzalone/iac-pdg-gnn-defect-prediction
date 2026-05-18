@@ -1,0 +1,4 @@
+List of repositories made private:
+- openstack-ops, 'https://github.com/rcbops/openstack-ops.git/'
+- ansible-rabbitmq, 'https://github.com/stone-payments/ansible-rabbitmq.git/'
+- PGBlitz, 'https://github.com/PGBlitz/PGBlitz.com.git/'
