@@ -3,3 +3,8 @@
 __pycache__/
 /.vscode/
 gnn/data/
+rq1/
+rq2/
+rq4/
+docs/
+utils/

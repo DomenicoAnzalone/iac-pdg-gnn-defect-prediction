@@ -1,5 +1,10 @@
 GitPython
 networkx
+torch>=1.13.0
+torch-geometric
+scikit-learn
+pandas
+torchvision
 lxml
 torch
 torch-geometric

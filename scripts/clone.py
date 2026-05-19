@@ -13,7 +13,14 @@ def clone_repositories():
             if os.path.exists(os.path.normpath(os.path.join(os.getcwd(), "input", "repositories", nome_repository))):
                 print(f"{nome_repository} already exists, skipping...")
                 continue
-            git.Repo.clone_from(GITHUB_PREFIX+username_github+".git", os.path.normpath(os.path.join(os.getcwd(), "input", "repositories", nome_repository)))
+            try:
+                git.Repo.clone_from(GITHUB_PREFIX+username_github+".git", os.path.normpath(os.path.join(os.getcwd(), "input", "repositories", nome_repository)))
+            except git.GitCommandError as e:
+                if "Authentication failed" in str(e) or "could not read Username" in str(e):
+                    print(f"Authentication required for {nome_repository}, skipping...")
+                    continue
+                else:
+                    raise
     except:
         traceback.print_exc()
 
