@@ -25,18 +25,10 @@ WORKDIR /scansible
 
 RUN pip install --no-deps .
 
-RUN pip install \
-    networkx \
-    PyYAML \
-    matplotlib \
-    pandas \
-    gitpython \
-    pydot
+WORKDIR /app
 
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
 
 CMD ["bash"]
