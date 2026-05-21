@@ -1,5 +1,7 @@
+from importlib.resources import path
 import os
 import shutil
+import pandas as pd
 
 def clean_output_dir():
     directory = os.path.normpath(os.path.join(os.getcwd(), "output", "repositories"))
@@ -17,4 +19,24 @@ def clean_repository(repository : str):
     path = os.path.normpath(os.path.join(os.getcwd(), "input", "repositories", repository, "PDG"))
     if(os.path.exists(path = path)):
         shutil.rmtree(path = path)
+
+def clean_dataset(dataset_path: str):
+
+    if os.path.exists(dataset_path):
+        df = pd.read_csv(dataset_path)
+        df = df[
+            [
+                "commit",
+                "repository",
+                "committed_at",
+                "filepath",
+                "failure_prone"
+            ]
+        ]
+
+        cleaned_file_path = "../input/ansible_cleaned.csv"
+        df.to_csv(cleaned_file_path, index=False)
+        print("Saved:", cleaned_file_path)
+    else:
+        print("File not found:", dataset_path)
         
