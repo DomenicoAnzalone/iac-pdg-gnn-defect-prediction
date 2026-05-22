@@ -1,97 +1,9 @@
 """
-File-Level PDG Baseline Comparator
-===================================
-
 OBJECTIVE:
 ---------
 Extract metrics from file-level PDGs directly and compare them with baseline metrics
 (which were obtained via task-level PDG extraction + file-level aggregation).
 
-DESIGN DECISIONS & ARCHITECTURE:
--------------------------------
-
-1. LEGACY CODE REUSE:
-   - Import from: legacy.task_metrics (for metric calculation functions)
-   - Key functions reused:
-     * verticesCount(G) - counts nodes in PDG
-     * edgesCount(G) - counts edges in PDG
-     * edgesToVerticesRatio(G) - ratio calculation
-     * globalInput(G) - non-local variables + parameters (requires node attributes)
-     * globalOutput(G) - non-local variables modified (requires node attributes)
-   
-2. TASK-LEVEL vs FILE-LEVEL PDG DIFFERENCES:
-   - TASK-LEVEL PDG (baseline):
-     * Format: GraphML (.gml files)
-     * Contains detailed node attributes: node_type, scope_level, version, location
-     * FanIn/FanOut metrics are cross-playbook dependencies
-     * Located: output/repositories/<repo>/<filepath>_<nodeId>.gml
-     * Multiple PDGs per file (one per task), aggregated to file-level
-   
-   - FILE-LEVEL PDG (this script):
-     * Format: DOT (pdg.dot files) - GraphQL/Graphviz format
-     * Contains simplified node structure (task names + arguments)
-     * NO node_type, scope_level, version attributes in DOT
-     * NO cross-playbook relationships available
-     * Located: output/pdg/<repository>/<commit>/<filepath>/PDG_FILE_LEVEL/pdg.dot
-     * One PDG per file
-
-3. METRIC EXTRACTION STRATEGY:
-   - File-level PDG DOT → NetworkX MultiDiGraph (via nx.read_dot())
-   - Metrics from simple graph structure:
-     ✓ verticesCount = len(G.nodes)
-     ✓ edgesCount = len(G.edges)
-     ✓ edgesToVerticesRatio = edgesCount / verticesCount
-     ✓ maxPdgVertices = verticesCount (since single PDG per file)
-   
-   - Metrics requiring node attributes (not available in file-level DOT):
-     ✗ globalInput: REQUIRES node attributes → return 0 (NO DATA)
-     ✗ globalOutput: REQUIRES node attributes → return 0 (NO DATA)
-   
-   - Cross-playbook metrics (not applicable to single file):
-     ✗ directFanIn: requires playbook dictionary → return 0
-     ✗ indirectFanIn: requires playbook dictionary → return 0
-     ✗ directFanOut: requires playbook dictionary → return 0
-     ✗ indirectFanOut: requires playbook dictionary → return 0
-   
-   - Cohesion metric:
-     • lackOfCohesion: shared nodes between tasks
-     • For file-level: = verticesCount (no task-level decomposition in DOT)
-
-4. ERROR HANDLING:
-   - Missing PDG directories → log warning, skip row
-   - Empty/missing pdg.dot → log warning, skip row
-   - Corrupted DOT syntax → catch exception, log error, skip row
-   - Division by zero (vertices=0) → handle gracefully with 0 ratio
-   - CSV read/write errors → catch and log
-
-5. PATHLIB USAGE:
-   - Replace manual string concatenation with Path objects
-   - Ensures cross-platform compatibility (Windows/Linux paths)
-
-6. LOGGING:
-   - Structured logging with timestamp, level, message
-   - Log each processed PDG (success/failure)
-   - Log summary statistics at end
-
-7. INPUT/OUTPUT:
-   - Input: output/extraction_status.csv (columns: repository, commit, filepath, status)
-   - Output: output/baseline_metric_comparison_status.csv
-   - Process ONLY rows with status == "SUCCESS"
-
-LIMITATIONS & FUTURE IMPROVEMENTS:
----------------------------------
-- globalInput/globalOutput = 0 (unavailable in DOT format)
-  → Possible solution: Parse GraphML if available, fallback to DOT
-- FanIn/FanOut = 0 (single-file context)
-  → Possible solution: Build cross-file dependency graph for comparison
-- lackOfCohesion = verticesCount (no sub-task structure in DOT)
-  → More research needed on how to decompose file-level PDG
-
-TESTING VERIFICATION:
---------------------
-- Sample extracted metrics vs baseline metrics (if available)
-- Visual comparison of a few matching PDGs
-- Statistical analysis of metric distributions
 """
 
 import logging
@@ -103,14 +15,11 @@ from typing import Dict, Tuple, Optional
 import traceback
 import pydot
 
-# Configure logging
+# Configure logging to stdout; file handler is created per execution inside the extractor
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('file_level_pdg_extraction.log')
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
 
@@ -129,9 +38,68 @@ class FileLevelPDGExtractor:
         self.extraction_status_path = self.workspace_root / "output" / "extraction_status.csv"
         self.pdg_output_dir = self.workspace_root / "output" / "pdg"
         self.output_csv = self.workspace_root / "output" / "baseline_metric_comparison_status.csv"
-        
+        self.output_log = self.workspace_root / "output" / "baseline_metric_comparison.log"
+
+        self.metric_columns = [
+            "maxPdgVertices",
+            "verticesCount",
+            "edgesToVerticesRatio",
+            "edgesCount",
+            "globalInput",
+            "lackOfCohesion",
+            "indirectFanOut",
+            "indirectFanIn",
+            "directFanOut",
+            "directFanIn",
+            "globalOutput"
+        ]
+        self.output_columns = [
+            "repository",
+            "commit",
+            "filepath",
+        ] + [col for metric in self.metric_columns for col in (metric, f"{metric}_baseline")]
+
+        self.prepare_output_files()
+        self.baseline_df = self.load_baseline_metrics()
+
         logger.info(f"Initialized extractor with workspace: {self.workspace_root}")
     
+    def prepare_output_files(self) -> None:
+        """Prepare and truncate output CSV and log files before processing."""
+        self.output_csv.parent.mkdir(parents=True, exist_ok=True)
+        self.output_log.parent.mkdir(parents=True, exist_ok=True)
+
+        self.output_csv.write_text(
+            ",".join(self.output_columns) + "\n",
+            encoding="utf-8"
+        )
+
+        # Replace any existing file handler so each execution creates a fresh log file
+        for handler in list(logger.handlers):
+            if isinstance(handler, logging.FileHandler):
+                logger.removeHandler(handler)
+
+        file_handler = logging.FileHandler(self.output_log, mode="w", encoding="utf-8")
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(file_handler)
+
+    def load_baseline_metrics(self) -> pd.DataFrame:
+        """Load baseline metric values from input/ansible.csv."""
+        baseline_path = self.workspace_root / "input" / "ansible.csv"
+        try:
+            cols = ["repository", "commit", "filepath"] + self.metric_columns
+            df = pd.read_csv(baseline_path, usecols=cols)
+            df = df.drop_duplicates(subset=["repository", "commit", "filepath"], keep="first")
+            df = df.rename(columns={metric: f"{metric}_baseline" for metric in self.metric_columns})
+            logger.info(f"Loaded baseline metrics from ansible.csv with {len(df)} rows")
+            return df
+        except FileNotFoundError:
+            logger.error(f"Baseline file not found at {baseline_path}")
+            raise
+        except Exception as e:
+            logger.error(f"Error loading baseline metrics: {e}\n{traceback.format_exc()}")
+            raise
+
     def load_extraction_status(self) -> pd.DataFrame:
         """
         Load extraction status CSV.
@@ -347,6 +315,12 @@ class FileLevelPDGExtractor:
         
         # Convert to DataFrame
         df_results = pd.DataFrame(results)
+        if not df_results.empty:
+            df_results = df_results.merge(
+                self.baseline_df,
+                on=["repository", "commit", "filepath"],
+                how="left"
+            )
         return df_results
     
     def save_results(self, df_results: pd.DataFrame) -> None:
@@ -361,14 +335,7 @@ class FileLevelPDGExtractor:
             self.output_csv.parent.mkdir(parents=True, exist_ok=True)
             
             # Define column order
-            columns_order = [
-                'repository', 'commit', 'filepath',
-                'maxPdgVertices', 'verticesCount', 'edgesToVerticesRatio', 'edgesCount',
-                'globalInput', 'lackOfCohesion',
-                'indirectFanOut', 'indirectFanIn',
-                'directFanOut', 'directFanIn',
-                'globalOutput'
-            ]
+            columns_order = self.output_columns
             
             # Reorder columns
             df_results = df_results[[col for col in columns_order if col in df_results.columns]]

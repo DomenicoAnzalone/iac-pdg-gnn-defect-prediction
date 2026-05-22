@@ -9,11 +9,11 @@ import change_commit as change_commit
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-INPUT_CSV = ROOT_DIR / "input" / "ansible_cleaned.csv"
+INPUT_CSV = ROOT_DIR / "input" / "ansible_core_features.csv"
 REPOS_ROOT = ROOT_DIR / "input" / "repositories"
 OUTPUT_REPORT = ROOT_DIR / "output" / "extraction_report.txt"
 OUTPUT_STATUS_CSV = ROOT_DIR / "output" / "extraction_status.csv"
-OUTPUT_PDG_ROOT = ROOT_DIR / "output" / "pdg"
+OUTPUT_PDG_ROOT = ROOT_DIR / "output" / "pdg_file_level"
 
 
 def main() -> None:
@@ -22,12 +22,22 @@ def main() -> None:
     initialize_status_csv(OUTPUT_STATUS_CSV)
 
     rows = load_dataset(INPUT_CSV)
+
+    last_processed_index = get_last_processed_row_index(OUTPUT_STATUS_CSV)
+
+    start_index = last_processed_index + 1
+
     success_count = 0
     failure_count = 0
 
     print(f"Processing {len(rows)} rows from {INPUT_CSV}")
+    print(f"Resuming from dataset row_index {start_index}")
 
     for idx, row in enumerate(rows, start=1):
+
+        if idx < start_index:
+            continue
+
         repository = row.get("repository")
         commit = row.get("commit")
         filepath = row.get("filepath")
@@ -237,6 +247,27 @@ def main() -> None:
     )
     append_report(report_path, summary)
     print(summary)
+
+def get_last_processed_row_index(csv_path: Path) -> int:
+
+    if not csv_path.exists():
+        return 0
+
+    with csv_path.open(newline="", encoding="utf-8") as csvfile:
+
+        reader = csv.DictReader(csvfile)
+
+        rows = list(reader)
+
+        if not rows:
+            return 0
+
+        last_row = rows[-1]
+
+        try:
+            return int(last_row["row_index"])
+        except Exception:
+            return 0
 
 def extract_file_pdg(
     file_path: Path,
