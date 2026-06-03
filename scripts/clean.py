@@ -41,6 +41,7 @@ def clean_metrics_cols(dataset_path: str):
     else:
         print("File not found:", dataset_path)
 
+# Clean rows in ansible.csv where pdg metrics are NaN
 def clean_rows_without_pdg_metrics(dataset_path: str):
     
     input_csv = Path(dataset_path)
@@ -71,3 +72,17 @@ def clean_rows_without_pdg_metrics(dataset_path: str):
     df_cleaned.to_csv(output_csv, index=False)
 
     print(f"CSV pulito salvato in: {output_csv}")
+
+
+# Clean rows where the status is not SUCCESS
+# This is used on the output of the extraction script where we have the status of the extraction for each file.
+def clean_no_success_row(dataset_path: str):
+    input_csv = Path(dataset_path)
+
+    output_csv = Path("output") / "ansible_rows_successfull_extracted.csv"
+
+    df = pd.read_csv(input_csv, on_bad_lines='skip')
+
+    df_cleaned = df[df["status"] == "SUCCESS"]
+
+    df_cleaned.to_csv(output_csv, index=False)
