@@ -10,3 +10,6 @@ rq4/
 docs/
 utils/
 /scansible/
+/radon_dataset_extraction/.docker-tmp 
+/radon_dataset_extraction/output/
+/radon_dataset_extraction/scripts/__psycache__/

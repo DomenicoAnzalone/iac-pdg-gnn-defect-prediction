@@ -1,0 +1,13 @@
+.git
+output
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.env
+.key.json
+.docker-tmp
+.DS_Store
+Thumbs.db
