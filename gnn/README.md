@@ -1,5 +1,24 @@
 # GNN Pipeline
 
+This folder implements model selection, training, evaluation and baseline comparisons for PDG-based defect prediction using Graph Neural Networks.
+
+Quick usage (after installing dependencies):
+
+Run a preview of preprocessing and splits (no training):
+
+```
+python -m gnn.run_pipeline --label-csv output/ansible_rows_successfull_extracted.csv --preview-per-split 3 --max-splits 2
+```
+
+Run training for one or more models (example):
+
+```
+python -m gnn.run_pipeline --train --models gcn --epochs 10 --batch-size 8 --output-root output/gnn_runs
+```
+
+All results for each run are written under the `--output-root` folder in a timestamped subfolder.
+# GNN Pipeline
+
 Questo folder riunisce la pipeline di preprocessing e sampling per il problema di defect prediction sui PDG file-level.
 
 ## Scopo

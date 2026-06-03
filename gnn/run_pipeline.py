@@ -7,6 +7,14 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
+import json
+from datetime import datetime
+
+from gnn.models import get_model
+from gnn.train import Trainer
+from gnn.eval import compute_metrics
+from gnn.baselines import train_baseline
+from gnn.experiment import ExperimentManager
 
 from gnn.preprocessing.dataset import GraphDatasetBuilder
 from gnn.sampling.balance import GraphBalancer
@@ -85,6 +93,12 @@ def run_pipeline(
     preview_per_split: int,
     max_splits: Optional[int],
     remote_prefix: str,
+    do_train: bool = False,
+    models: Optional[List[str]] = None,
+    output_root: Optional[Path] = None,
+    epochs: int = 20,
+    batch_size: int = 16,
+    lr: float = 1e-3,
 ) -> List[PipelineSummary]:
     builder = GraphDatasetBuilder(
         label_csv=label_csv,
@@ -117,9 +131,11 @@ def run_pipeline(
         validation_source = split_with_val.validation if split_with_val.validation is not None else pd.DataFrame(
             columns=split_with_val.train.columns
         )
-        train_data = build_graph_data_for_rows(builder, sample_index, balanced_train, limit=preview_per_split)
-        validation_data = build_graph_data_for_rows(builder, sample_index, validation_source, limit=preview_per_split)
-        test_data = build_graph_data_for_rows(builder, sample_index, split_with_val.test, limit=preview_per_split)
+        # build preview or full datasets depending on training mode
+        limit = None if do_train else preview_per_split
+        train_data = build_graph_data_for_rows(builder, sample_index, balanced_train, limit=limit)
+        validation_data = build_graph_data_for_rows(builder, sample_index, validation_source, limit=limit)
+        test_data = build_graph_data_for_rows(builder, sample_index, split_with_val.test, limit=limit)
 
         summaries.append(
             PipelineSummary(
@@ -149,6 +165,55 @@ def run_pipeline(
         logging.info("Validation summary: %s", summarize_dataframe(validation_source))
         logging.info("Test summary: %s", summarize_dataframe(split_with_val.test))
         logging.info("Preview build: train=%s, validation=%s, test=%s", len(train_data), len(validation_data), len(test_data))
+
+        # Training flow
+        if do_train and models is not None and len(train_data) and output_root is not None:
+            manager = ExperimentManager(output_root)
+            for model_name in models:
+                config = {
+                    "model": model_name,
+                    "split_repository": split.repository,
+                    "test_commit": split_with_val.test_commit,
+                    "balance_strategy": balance_strategy,
+                    "validation_ratio": validation_ratio,
+                    "batch_size": batch_size,
+                    "epochs": epochs,
+                    "lr": lr,
+                }
+                run_folder = manager.create_run(model_name, config)
+
+                # prepare pyg Data objects if present
+                train_pyg = [d["pyg_data"] for d in train_data if d.get("pyg_data") is not None]
+                val_pyg = [d["pyg_data"] for d in validation_data if d.get("pyg_data") is not None]
+                test_pyg = [d["pyg_data"] for d in test_data if d.get("pyg_data") is not None]
+
+                if not train_pyg:
+                    logging.warning("No PyG data available for training for model %s on split %s", model_name, split.repository)
+                    continue
+
+                in_channels = int(train_pyg[0].x.shape[1])
+                model = get_model(model_name, in_channels=in_channels)
+                trainer = Trainer(model, lr=lr)
+                history = trainer.fit(train_pyg, val_pyg if val_pyg else None, epochs=epochs, batch_size=batch_size, early_stopping=5, out_dir=run_folder)
+
+                # evaluate on test set
+                if test_pyg:
+                    preds = trainer.predict(test_pyg, batch_size=batch_size)
+                    metrics = compute_metrics(preds["y_true"], preds["y_pred"], preds["y_score"])
+                else:
+                    metrics = {}
+
+                # save predictions and metrics
+                with open(run_folder / "metrics.json", "w", encoding="utf-8") as fh:
+                    json.dump({"metrics": metrics, "history": history}, fh, indent=2)
+                # save raw predictions CSV
+                try:
+                    import pandas as _pd
+
+                    df = _pd.DataFrame({"y_true": preds.get("y_true", []), "y_pred": preds.get("y_pred", []), "y_score": preds.get("y_score", [])})
+                    df.to_csv(run_folder / "predictions.csv", index=False)
+                except Exception:
+                    pass
 
     return summaries
 
@@ -198,6 +263,41 @@ def parse_args() -> argparse.Namespace:
         help="Prefisso remoto usato per rimappare i percorsi salvati all'interno del CSV.",
     )
     parser.add_argument(
+        "--train",
+        action="store_true",
+        help="Esegui anche la fase di training dei modelli GNN e salva i risultati.",
+    )
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        default=["gcn"],
+        help="Lista di modelli GNN da allenare (gcn, graphsage, gat, gin, rgcn).",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=20,
+        help="Numero massimo di epoche per l'allenamento.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+        help="Batch size per DataLoader durante l'allenamento.",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-3,
+        help="Learning rate per l'ottimizzatore.",
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=Path("output/gnn_runs"),
+        help="Cartella radice dove salvare i risultati sperimentali.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Abilita log dettagliati.",
@@ -217,6 +317,12 @@ def main() -> None:
         preview_per_split=args.preview_per_split,
         max_splits=args.max_splits,
         remote_prefix=args.remote_prefix,
+        do_train=args.train,
+        models=args.models,
+        output_root=args.output_root,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
     )
 
     for summary in summaries:

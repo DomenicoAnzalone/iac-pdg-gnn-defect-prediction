@@ -81,7 +81,7 @@ def clean_no_success_row(dataset_path: str):
 
     output_csv = Path("output") / "ansible_rows_successfull_extracted.csv"
 
-    df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv, on_bad_lines='skip')
 
     df_cleaned = df[df["status"] == "SUCCESS"]
 
