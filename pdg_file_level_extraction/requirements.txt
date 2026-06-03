@@ -1,0 +1,15 @@
+ansible-core==2.15.12
+attrs
+attrs-strict
+click
+graphviz
+jinja2
+kuzu
+loguru
+networkx>=3.0,<4
+pydot==4.0.1
+pydantic
+pyparsing>=3.1,<4
+requests
+rich
+rustworkx
