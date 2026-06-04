@@ -141,6 +141,24 @@ def parse_args() -> argparse.Namespace:
         help="Optional limit used for small validation runs.",
     )
     parser.add_argument(
+        "--progress-interval",
+        type=int,
+        default=30,
+        help="Minimum seconds between console progress updates. Default: 30.",
+    )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=250,
+        help="Print progress after this many newly completed rows. Default: 250.",
+    )
+    parser.add_argument(
+        "--progress-active-repos",
+        type=int,
+        default=5,
+        help="Maximum active repositories shown in each progress update. Default: 5.",
+    )
+    parser.add_argument(
         "--min-pdg-nodes",
         type=int,
         default=3,
@@ -174,6 +192,12 @@ def main() -> None:
         raise SystemExit("--timeout cannot be negative")
     if args.max_rows is not None and args.max_rows < 1:
         raise SystemExit("--max-rows must be at least 1")
+    if args.progress_interval < 1:
+        raise SystemExit("--progress-interval must be at least 1")
+    if args.progress_every < 1:
+        raise SystemExit("--progress-every must be at least 1")
+    if args.progress_active_repos < 0:
+        raise SystemExit("--progress-active-repos cannot be negative")
     if args.min_pdg_nodes < 1:
         raise SystemExit("--min-pdg-nodes must be at least 1")
     if args.min_pdg_edges < 1:
@@ -252,6 +276,9 @@ def main() -> None:
                 keep_dot=args.keep_dot,
                 min_pdg_nodes=args.min_pdg_nodes,
                 min_pdg_edges=args.min_pdg_edges,
+                progress_interval=args.progress_interval,
+                progress_every=args.progress_every,
+                progress_active_repos=args.progress_active_repos,
                 workers=args.workers,
             )
         else:
@@ -447,6 +474,9 @@ def run_parallel_extraction(
     keep_dot: bool,
     min_pdg_nodes: int,
     min_pdg_edges: int,
+    progress_interval: int,
+    progress_every: int,
+    progress_active_repos: int,
     workers: int,
 ) -> None:
     stop_event.clear()
@@ -454,6 +484,12 @@ def run_parallel_extraction(
     result_queue: queue.Queue[dict[str, str]] = queue.Queue()
     executor = ThreadPoolExecutor(max_workers=max_workers)
     future_map = {}
+    progress = ConsoleProgress(
+        total_rows=total_rows,
+        interval_seconds=progress_interval,
+        completed_delta=progress_every,
+        active_repos_limit=progress_active_repos,
+    )
 
     try:
         for group_index, (group_key, group_rows) in enumerate(groups, start=1):
@@ -481,9 +517,9 @@ def run_parallel_extraction(
             if drained:
                 write_status_outputs(status_file, success_file, results)
                 write_report(report_file, None, results)
+                progress.maybe_print(results)
 
             if not done:
-                print_progress(total_rows, results)
                 continue
 
             for future in done:
@@ -504,11 +540,12 @@ def run_parallel_extraction(
                             )
                 write_status_outputs(status_file, success_file, results)
                 write_report(report_file, None, results)
-                print_progress(total_rows, results)
+                progress.maybe_print(results, force=True)
 
         drain_result_queue(result_queue, results)
         write_status_outputs(status_file, success_file, results)
         write_report(report_file, None, results)
+        progress.maybe_print(results, force=True)
     except KeyboardInterrupt:
         print("Interruption requested. Stopping active Scansible processes...")
         stop_event.set()
@@ -553,8 +590,9 @@ def process_repository_group(
         }
 
     print(
-        f"START REPOSITORY [{group_index}/{total_groups}] "
-        f"{repository_label} rows={len(rows)}"
+        f"[repo {group_index}/{total_groups}] start "
+        f"{shorten_text(repository_label, 46)} ({len(rows)} rows)",
+        flush=True,
     )
 
     completed_count = 0
@@ -633,13 +671,14 @@ def process_repository_group(
         try:
             remove_directory_tree(clone_path, clone_root)
         except Exception as exc:
-            print(f"Could not remove temporary clone {clone_path}: {exc}")
+            print(f"Could not remove temporary clone {clone_path}: {exc}", flush=True)
         with active_repositories_lock:
             active_repositories.pop(process_key, None)
 
     print(
-        f"DONE REPOSITORY [{group_index}/{total_groups}] "
-        f"{repository_label} completed_rows={completed_count}"
+        f"[repo {group_index}/{total_groups}] done  "
+        f"{shorten_text(repository_label, 46)} ({completed_count}/{len(rows)} rows)",
+        flush=True,
     )
     return completed_count
 
@@ -1243,6 +1282,9 @@ def write_run_metadata(
             "keep_dot": args.keep_dot,
             "min_pdg_nodes": args.min_pdg_nodes,
             "min_pdg_edges": args.min_pdg_edges,
+            "progress_interval": args.progress_interval,
+            "progress_every": args.progress_every,
+            "progress_active_repos": args.progress_active_repos,
             "refresh_input": args.refresh_input,
             "force": args.force,
             "max_rows": args.max_rows,
@@ -1301,28 +1343,116 @@ def update_active_repository(process_key: str, **values: object) -> None:
             active_repositories[process_key].update(values)
 
 
-def print_progress(total_rows: int, results: dict[int, dict[str, str]]) -> None:
+class ConsoleProgress:
+    def __init__(
+        self,
+        total_rows: int,
+        interval_seconds: int,
+        completed_delta: int,
+        active_repos_limit: int,
+    ) -> None:
+        self.total_rows = total_rows
+        self.interval_seconds = interval_seconds
+        self.completed_delta = completed_delta
+        self.active_repos_limit = active_repos_limit
+        self.last_print_at = 0.0
+        self.last_completed = 0
+
+    def maybe_print(
+        self,
+        results: dict[int, dict[str, str]],
+        force: bool = False,
+    ) -> None:
+        completed = len(results)
+        now = time.monotonic()
+        enough_time = now - self.last_print_at >= self.interval_seconds
+        enough_rows = completed - self.last_completed >= self.completed_delta
+        if not force and not enough_time and not enough_rows:
+            return
+        if completed == self.last_completed and not force:
+            return
+
+        self.last_print_at = now
+        self.last_completed = completed
+        print_progress_snapshot(
+            total_rows=self.total_rows,
+            results=results,
+            active_repos_limit=self.active_repos_limit,
+        )
+
+
+def print_progress_snapshot(
+    total_rows: int,
+    results: dict[int, dict[str, str]],
+    active_repos_limit: int,
+) -> None:
     completed = len(results)
-    width = 28
+    width = 24
     filled = int(width * completed / total_rows) if total_rows else width
     bar = "#" * filled + "-" * (width - filled)
+    percent = (completed / total_rows * 100) if total_rows else 100.0
     counts: dict[str, int] = defaultdict(int)
     for row in results.values():
         counts[row.get("status", "UNKNOWN")] += 1
 
     with active_repositories_lock:
-        running = list(active_repositories.values())
-
-    count_text = " ".join(f"{key}={value}" for key, value in sorted(counts.items()))
-    print(
-        f"Progress [{bar}] {completed}/{total_rows} completed | "
-        f"running_repositories={len(running)} | {count_text}"
-    )
-    for item in running[:8]:
-        print(
-            f"  - {item['label']}: {item['completed']}/{item['total']} "
-            f"last=\"{item['last_line']}\""
+        running = sorted(
+            list(active_repositories.values()),
+            key=lambda item: int(item.get("completed", 0)),
+            reverse=True,
         )
+
+    count_text = format_status_counts(counts)
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] "
+        f"[{bar}] {completed}/{total_rows} ({percent:5.1f}%) | "
+        f"active={len(running)} | {count_text}",
+        flush=True,
+    )
+    if active_repos_limit <= 0 or not running:
+        return
+
+    visible = running[:active_repos_limit]
+    repo_text = " | ".join(format_active_repository(item) for item in visible)
+    remaining = len(running) - len(visible)
+    if remaining > 0:
+        repo_text += f" | +{remaining} active"
+    print(f"  active repos: {repo_text}", flush=True)
+
+
+def format_status_counts(counts: dict[str, int]) -> str:
+    preferred = [
+        "SUCCESS",
+        "LOW_QUALITY_GRAPH",
+        "UNSUPPORTED_FILE_TYPE",
+        "EMPTY_GRAPH",
+        "REAL_EXTRACTION_FAILURE",
+        "CHECKOUT_FAILURE",
+        "CLONE_FAILURE",
+    ]
+    parts = [f"{key}={counts[key]}" for key in preferred if counts.get(key)]
+    extras = [
+        f"{key}={value}"
+        for key, value in sorted(counts.items())
+        if key not in preferred and value
+    ]
+    return " ".join(parts + extras) or "no completed rows yet"
+
+
+def format_active_repository(item: dict[str, object]) -> str:
+    label = shorten_text(str(item.get("label", "")), 30)
+    completed = item.get("completed", 0)
+    total = item.get("total", 0)
+    return f"{label} {completed}/{total}"
+
+
+def shorten_text(value: str, limit: int) -> str:
+    text = str(value)
+    if len(text) <= limit:
+        return text
+    if limit <= 1:
+        return text[:limit]
+    return text[: limit - 1] + "~"
 
 
 def print_final_summary(
