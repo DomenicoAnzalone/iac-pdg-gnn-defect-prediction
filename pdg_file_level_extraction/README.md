@@ -388,6 +388,9 @@ riutilizzati se la stessa tupla ricompare nel nuovo dataset.
 | `--keep-dot` / `--no-keep-dot` | Mantiene o elimina il file DOT dopo la conversione |
 | `--min-pdg-nodes` | Numero minimo di nodi per considerare il PDG utilizzabile; default `3` |
 | `--min-pdg-edges` | Numero minimo di archi per considerare il PDG utilizzabile; default `2` |
+| `--progress-interval` | Secondi minimi tra due aggiornamenti di progresso in console; default `30` |
+| `--progress-every` | Righe completate tra due aggiornamenti di progresso; default `250` |
+| `--progress-active-repos` | Numero massimo di repository attive mostrate in ogni aggiornamento; default `5` |
 | `--refresh-input` | Sostituisce lo snapshot di input e azzera gli stati |
 | `--force` | Elimina la run e riparte da zero |
 | `--max-rows` | Limita le righe per test piccoli |
@@ -395,6 +398,36 @@ riutilizzati se la stessa tupla ricompare nel nuovo dataset.
 All'avvio il runner esegue un preflight di Scansible con `scansible --help`. Se
 Scansible non parte, la pipeline termina subito senza clonare repository e senza
 produrre migliaia di fallimenti ripetitivi.
+
+## Output console
+
+La console è pensata per rimanere leggibile anche con molti worker. Di default la
+pipeline stampa:
+
+- una riga breve quando una repository parte;
+- una riga breve quando una repository termina;
+- un riepilogo compatto ogni 30 secondi o ogni 250 righe completate.
+
+Esempio:
+
+```text
+[repo 3/42] start geerlingguy/ansible-role-security (253 rows)
+[18:42:10] [###---------------------] 820/61542 (  1.3%) | active=16 | SUCCESS=540 LOW_QUALITY_GRAPH=3 UNSUPPORTED_FILE_TYPE=260
+  active repos: dev-sec/ansible-collection-ha~ 42/4215 | geerlingguy/ansible-role-s~ 51/253 | +14 active
+[repo 3/42] done  geerlingguy/ansible-role-security (253/253 rows)
+```
+
+Per una console ancora più silenziosa:
+
+```text
+--progress-interval 120 --progress-every 1000 --progress-active-repos 3
+```
+
+Per debug più frequente:
+
+```text
+--progress-interval 5 --progress-every 25 --progress-active-repos 10
+```
 
 ## Test rapido
 
