@@ -24,7 +24,7 @@ Il dataset finale è il punto di ingresso comune per il confronto tra:
 ## Contenuto
 
 ```text
-dataset_quality_analysis/
+dataset_preparation/
 ├── README.md
 ├── requirements.txt
 └── scripts/
@@ -49,14 +49,14 @@ poi produce:
 - report Markdown unico con storia del dataset, soglie e note metodologiche;
 - tabelle di supporto su label, repository, status, esclusioni e metriche PDG.
 
-### Comando usato per `ansible-2 v2026-06-06`
+### Comando usato per `ansible-pdg-defect-dataset v2026-06-06`
 
 ```powershell
-python dataset_quality_analysis\scripts\build_versioned_dataset.py `
+python dataset_preparation\scripts\build_versioned_dataset.py `
   --radon-input output\second_pdg_extraction\input_dataset.csv `
-  --extraction-status datasets\ansible-2\pdg_extraction\extraction_status.csv `
-  --output-root datasets\ansible-2\final `
-  --dataset-id ansible-2 `
+  --extraction-status datasets\ansible-pdg-defect-dataset\pdg_extraction\extraction_status.csv `
+  --output-root datasets\ansible-pdg-defect-dataset\final `
+  --dataset-id ansible-pdg-defect-dataset `
   --version v2026-06-06 `
   --min-pdg-nodes 3 `
   --min-pdg-edges 2 `
@@ -67,10 +67,10 @@ python dataset_quality_analysis\scripts\build_versioned_dataset.py `
 Output principale:
 
 ```text
-datasets/ansible-2/final/v2026-06-06/
-├── ansible-2_v2026-06-06_final.csv
-├── ansible-2_v2026-06-06_exclusions.csv
-├── ansible-2_v2026-06-06_pdg_metrics.csv
+datasets/ansible-pdg-defect-dataset/final/v2026-06-06/
+├── ansible-pdg-defect-dataset_v2026-06-06_final.csv
+├── ansible-pdg-defect-dataset_v2026-06-06_exclusions.csv
+├── ansible-pdg-defect-dataset_v2026-06-06_pdg_metrics.csv
 ├── DATASET_REPORT.md
 ├── manifest.json
 └── reports/
@@ -157,7 +157,7 @@ estrazione e dataset GNN utilizzabile.
 ```powershell
 cd "C:\Users\dosoa\Documents\Tesi Magistrale\iac-pdg-gnn-defect-prediction"
 
-python dataset_quality_analysis\scripts\analyze_dataset_quality.py `
+python dataset_preparation\scripts\analyze_dataset_quality.py `
   --input output\second_pdg_extraction\extraction_status.csv `
   --label-column failure_prone `
   --repo-column repository `
@@ -179,7 +179,7 @@ dei file sul disco locale.
 Per analizzare metriche statiche/process/delta prima della PDG extraction:
 
 ```powershell
-python dataset_quality_analysis\scripts\analyze_dataset_quality.py `
+python dataset_preparation\scripts\analyze_dataset_quality.py `
   --input output\second_pdg_extraction\input_dataset.csv `
   --label-column failure_prone `
   --repo-column repo_url `

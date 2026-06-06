@@ -1,17 +1,17 @@
 {
-  "dataset_id": "ansible-2",
+  "dataset_id": "ansible-pdg-defect-dataset",
   "version": "v2026-06-06",
   "generated_at": "2026-06-06T15:37:12.772507+00:00",
   "inputs": {
     "radon_input": "output\\second_pdg_extraction\\input_dataset.csv",
-    "extraction_status": "datasets\\ansible-2\\pdg_extraction\\extraction_status.csv",
+    "extraction_status": "datasets\\ansible-pdg-defect-dataset\\pdg_extraction\\extraction_status.csv",
     "graph_base_dir": "output"
   },
   "outputs": {
-    "final_dataset": "datasets\\ansible-2\\final\\v2026-06-06\\ansible-2_v2026-06-06_final.csv",
-    "exclusions": "datasets\\ansible-2\\final\\v2026-06-06\\ansible-2_v2026-06-06_exclusions.csv",
-    "pdg_metrics": "datasets\\ansible-2\\final\\v2026-06-06\\ansible-2_v2026-06-06_pdg_metrics.csv",
-    "reports_dir": "datasets\\ansible-2\\final\\v2026-06-06\\reports"
+    "final_dataset": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_final.csv",
+    "exclusions": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_exclusions.csv",
+    "pdg_metrics": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_pdg_metrics.csv",
+    "reports_dir": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\reports"
   },
   "parameters": {
     "min_pdg_nodes": 3,

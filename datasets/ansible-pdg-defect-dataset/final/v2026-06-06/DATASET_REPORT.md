@@ -1,19 +1,19 @@
-# Dataset Report - ansible-2 v2026-06-06
+# Dataset Report - ansible-pdg-defect-dataset v2026-06-06
 
 Generated at: 2026-06-06T15:37:12.772507+00:00
 
 ## Inputs
 
 - RADON input: `output\second_pdg_extraction\input_dataset.csv`
-- PDG extraction status: `datasets\ansible-2\pdg_extraction\extraction_status.csv`
+- PDG extraction status: `datasets\ansible-pdg-defect-dataset\pdg_extraction\extraction_status.csv`
 - Graph base directory: `output`
 
 ## Versioned Outputs
 
-- Final dataset: `datasets\ansible-2\final\v2026-06-06\ansible-2_v2026-06-06_final.csv`
-- Exclusions: `datasets\ansible-2\final\v2026-06-06\ansible-2_v2026-06-06_exclusions.csv`
-- PDG metrics: `datasets\ansible-2\final\v2026-06-06\ansible-2_v2026-06-06_pdg_metrics.csv`
-- Reports: `datasets\ansible-2\final\v2026-06-06\reports`
+- Final dataset: `datasets\ansible-pdg-defect-dataset\final\v2026-06-06\ansible-pdg-defect-dataset_v2026-06-06_final.csv`
+- Exclusions: `datasets\ansible-pdg-defect-dataset\final\v2026-06-06\ansible-pdg-defect-dataset_v2026-06-06_exclusions.csv`
+- PDG metrics: `datasets\ansible-pdg-defect-dataset\final\v2026-06-06\ansible-pdg-defect-dataset_v2026-06-06_pdg_metrics.csv`
+- Reports: `datasets\ansible-pdg-defect-dataset\final\v2026-06-06\reports`
 
 ## Filtering Story
 

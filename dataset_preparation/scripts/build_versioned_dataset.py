@@ -41,7 +41,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--radon-input", required=True, help="RADON CSV with tabular metrics.")
     parser.add_argument("--extraction-status", required=True, help="PDG extraction_status.csv.")
     parser.add_argument("--output-root", required=True, help="Root folder for versioned outputs.")
-    parser.add_argument("--dataset-id", required=True, help="Stable dataset id, e.g. ansible-2.")
+    parser.add_argument(
+        "--dataset-id",
+        required=True,
+        help="Stable dataset id, e.g. ansible-pdg-defect-dataset.",
+    )
     parser.add_argument("--version", default="", help="Dataset version. Default: vYYYY-MM-DD.")
     parser.add_argument("--min-pdg-nodes", type=int, default=3, help="Minimum graph nodes.")
     parser.add_argument("--min-pdg-edges", type=int, default=2, help="Minimum graph edges.")
