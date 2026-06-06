@@ -1,0 +1,8 @@
+reason,rows
+pdg_status_UNSUPPORTED_FILE_TYPE,19128
+pdg_status_REAL_EXTRACTION_FAILURE,2002
+pdg_status_EMPTY_GRAPH,1603
+pdg_status_LOW_QUALITY_GRAPH,535
+pdg_status_CLONE_FAILURE,431
+graphml_parse_failure,38
+pdg_status_EXTRACTION_TIMEOUT,9
