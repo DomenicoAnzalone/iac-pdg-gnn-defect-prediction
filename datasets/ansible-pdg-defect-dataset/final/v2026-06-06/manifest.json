@@ -1,0 +1,61 @@
+{
+  "dataset_id": "ansible-pdg-defect-dataset",
+  "version": "v2026-06-06",
+  "generated_at": "2026-06-06T15:37:12.772507+00:00",
+  "inputs": {
+    "radon_input": "output\\second_pdg_extraction\\input_dataset.csv",
+    "extraction_status": "datasets\\ansible-pdg-defect-dataset\\pdg_extraction\\extraction_status.csv",
+    "graph_base_dir": "output"
+  },
+  "outputs": {
+    "final_dataset": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_final.csv",
+    "exclusions": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_exclusions.csv",
+    "pdg_metrics": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\ansible-pdg-defect-dataset_v2026-06-06_pdg_metrics.csv",
+    "reports_dir": "datasets\\ansible-pdg-defect-dataset\\final\\v2026-06-06\\reports"
+  },
+  "parameters": {
+    "min_pdg_nodes": 3,
+    "min_pdg_edges": 2,
+    "metric_semantics": "file_level_proxy_v1"
+  },
+  "stage_counts": {
+    "radon_rows": 61542,
+    "radon_unique_keys": 61542,
+    "status_rows": 61542,
+    "status_unique_keys": 61542,
+    "radon_rows_after_duplicate_key_filter": 61542,
+    "status_rows_after_duplicate_key_filter": 61542,
+    "rows_after_radon_status_merge": 61542,
+    "rows_after_successful_pdg_filter": 37834,
+    "rows_with_extracted_pdg_metrics": 37796,
+    "final_rows": 37796,
+    "final_columns": 160,
+    "final_repositories": 123,
+    "final_label_distribution": {
+      "0": 23880,
+      "1": 13916
+    }
+  },
+  "exclusion_reasons": {
+    "pdg_status_UNSUPPORTED_FILE_TYPE": 19128,
+    "pdg_status_REAL_EXTRACTION_FAILURE": 2002,
+    "pdg_status_EMPTY_GRAPH": 1603,
+    "pdg_status_LOW_QUALITY_GRAPH": 535,
+    "pdg_status_CLONE_FAILURE": 431,
+    "graphml_parse_failure": 38,
+    "pdg_status_EXTRACTION_TIMEOUT": 9
+  },
+  "pdg_metric_columns": [
+    "maxPdgVertices",
+    "lackOfCohesion",
+    "verticesCount",
+    "edgesCount",
+    "edgesToVerticesRatio",
+    "globalInput",
+    "globalOutput",
+    "directFanIn",
+    "indirectFanIn",
+    "directFanOut",
+    "indirectFanOut"
+  ]
+}

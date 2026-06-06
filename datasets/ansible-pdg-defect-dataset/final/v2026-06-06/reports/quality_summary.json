@@ -1,0 +1,84 @@
+{
+  "final_rows": 37796,
+  "final_columns": 160,
+  "final_repositories": 123,
+  "final_label_distribution": {
+    "0": 23880,
+    "1": 13916
+  },
+  "status_distribution_before_filter": {
+    "SUCCESS": 37834,
+    "UNSUPPORTED_FILE_TYPE": 19128,
+    "REAL_EXTRACTION_FAILURE": 2002,
+    "EMPTY_GRAPH": 1603,
+    "LOW_QUALITY_GRAPH": 535,
+    "CLONE_FAILURE": 431,
+    "EXTRACTION_TIMEOUT": 9
+  },
+  "exclusion_reasons": {
+    "pdg_status_UNSUPPORTED_FILE_TYPE": 19128,
+    "pdg_status_REAL_EXTRACTION_FAILURE": 2002,
+    "pdg_status_EMPTY_GRAPH": 1603,
+    "pdg_status_LOW_QUALITY_GRAPH": 535,
+    "pdg_status_CLONE_FAILURE": 431,
+    "graphml_parse_failure": 38,
+    "pdg_status_EXTRACTION_TIMEOUT": 9
+  },
+  "pdg_metrics": {
+    "maxPdgVertices": {
+      "min": 3.0,
+      "median": 32.0,
+      "max": 5403.0
+    },
+    "lackOfCohesion": {
+      "min": 0.0,
+      "median": 0.0,
+      "max": 1.0
+    },
+    "verticesCount": {
+      "min": 3.0,
+      "median": 32.0,
+      "max": 5403.0
+    },
+    "edgesCount": {
+      "min": 2.0,
+      "median": 37.0,
+      "max": 30313.0
+    },
+    "edgesToVerticesRatio": {
+      "min": 0.35294117647058826,
+      "median": 1.1538461538461537,
+      "max": 12.609400998336106
+    },
+    "globalInput": {
+      "min": 0.0,
+      "median": 11.0,
+      "max": 1989.0
+    },
+    "globalOutput": {
+      "min": 0.0,
+      "median": 0.0,
+      "max": 57.0
+    },
+    "directFanIn": {
+      "min": 1.0,
+      "median": 18.0,
+      "max": 28892.0
+    },
+    "indirectFanIn": {
+      "min": 0.0,
+      "median": 47.0,
+      "max": 1346690.0
+    },
+    "directFanOut": {
+      "min": 0.0,
+      "median": 5.0,
+      "max": 27499.0
+    },
+    "indirectFanOut": {
+      "min": 0.0,
+      "median": 4.0,
+      "max": 506596.0
+    }
+  }
+}
