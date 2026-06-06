@@ -44,9 +44,10 @@ Requisiti base:
 - Docker installato e in esecuzione;
 - accesso a Internet durante la build, per scaricare l'immagine Python e le
   dipendenze Python;
-- esecuzione del comando dalla root del progetto, dove si trova il `Dockerfile`.
+- esecuzione del comando dalla cartella `radon_dataset_extraction`, dove si
+  trova il Dockerfile dedicato alla fase.
 
-Dalla root del progetto:
+Dalla cartella `radon_dataset_extraction`:
 
 ```powershell
 docker build -t radon-ansible-pipeline .

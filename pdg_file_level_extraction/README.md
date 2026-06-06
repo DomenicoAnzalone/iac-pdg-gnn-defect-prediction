@@ -3,11 +3,12 @@
 Questa cartella contiene una pipeline isolata per estrarre Program Dependence Graph
 file-level da un dataset di file Ansible etichettati.
 
-La pipeline prende in input un CSV come:
+La pipeline prende in input un CSV RADON compatibile, ad esempio:
 
-- `input/first_pdg_extraction/ansible.csv`;
-- `input/second_pdg_extraction/ansible-2.csv`;
-- un altro dataset RADON compatibile.
+- `output/second_pdg_extraction/input_dataset.csv`, cioè lo snapshot RADON
+  usato dalla seconda estrazione;
+- un nuovo dataset RADON prodotto da `radon_dataset_extraction`;
+- un altro CSV compatibile con lo stesso schema minimo.
 
 Per ogni riga, la pipeline usa almeno:
 
@@ -38,8 +39,7 @@ Questa cartella fornisce quindi:
 ## Autonomia della fase
 
 La pipeline di estrazione file-level diretta è completamente contenuta in questa
-cartella. Lo script principale non importa moduli da `../scripts` e incorpora
-direttamente:
+cartella e incorpora direttamente:
 
 - derivazione dell'URL Git da `repository` o uso diretto di `repo_url`;
 - clone temporaneo delle repository;
@@ -51,20 +51,9 @@ direttamente:
 - generazione del CSV di stato e del CSV dei successi;
 - resume, metadati, report e parallelismo.
 
-Gli script rimasti nella cartella root `scripts/` non sono necessari per eseguire
-questa fase:
-
-| Script root | Motivo per cui non appartiene alla pipeline diretta |
-|---|---|
-| `file_level_pdg_baseline_comparator.py` | Calcola e confronta metriche dopo l'estrazione dei grafi |
-| `pdg_repo_level_extractor.py` | Estrae PDG repository-level, non PDG file-level diretti |
-| `pdg_combined_extractor.py` | Implementa una modalità alternativa repo-level -> file-level |
-| `clean.py` | Contiene utility legacy; il CSV dei successi è già generato dal runner |
-| `clone.py` | Utility legacy sostituita dal clone temporaneo interno al runner |
-| `change_commit.py` | Utility legacy sostituita dalla gestione Git interna al runner |
-
-Il vecchio entrypoint `scripts/pdg_file_level_extractor.py` è stato rimosso per
-evitare due implementazioni divergenti della stessa fase.
+La repository pulita mantiene questa fase come macro-fase autonoma. Le utility
+legacy presenti in passato nella root sono state rimosse per evitare due
+implementazioni divergenti della stessa operazione.
 
 ## Struttura
 
@@ -180,40 +169,19 @@ repository Scansible.
 
 ## Esecuzione con Docker
 
-### Esempio: prima estrazione
+### Esempio: nuova estrazione
 
 Dalla cartella `pdg_file_level_extraction`:
 
 ```powershell
 docker run --rm -it `
-  -v "${PWD}\..\input\first_pdg_extraction\ansible.csv:/app/input/ansible.csv:ro" `
+  -v "${PWD}\..\output\second_pdg_extraction\input_dataset.csv:/app/input/input_dataset.csv:ro" `
   -v "${PWD}\..\output:/app/output" `
   pdg-file-level-extraction `
   scripts/pdg_file_level_extractor.py `
-    --input /app/input/ansible.csv `
+    --input /app/input/input_dataset.csv `
     --output-dir /app/output `
-    --run-name first_pdg_extraction `
-    --workers 4 `
-    --timeout 600
-```
-
-L'output viene scritto in:
-
-```text
-output/first_pdg_extraction/
-```
-
-### Esempio: seconda estrazione
-
-```powershell
-docker run --rm -it `
-  -v "${PWD}\..\input\second_pdg_extraction\ansible-2.csv:/app/input/ansible-2.csv:ro" `
-  -v "${PWD}\..\output:/app/output" `
-  pdg-file-level-extraction `
-  scripts/pdg_file_level_extractor.py `
-    --input /app/input/ansible-2.csv `
-    --output-dir /app/output `
-    --run-name second_pdg_extraction `
+    --run-name pdg_extraction_new_run `
     --workers 8 `
     --timeout 600 `
     --min-pdg-nodes 3 `
@@ -224,13 +192,13 @@ docker run --rm -it `
 
 ```bash
 docker run --rm -it \
-  -v "$PWD/../input/first_pdg_extraction/ansible.csv:/app/input/ansible.csv:ro" \
+  -v "$PWD/../output/second_pdg_extraction/input_dataset.csv:/app/input/input_dataset.csv:ro" \
   -v "$PWD/../output:/app/output" \
   pdg-file-level-extraction \
   scripts/pdg_file_level_extractor.py \
-    --input /app/input/ansible.csv \
+    --input /app/input/input_dataset.csv \
     --output-dir /app/output \
-    --run-name first_pdg_extraction \
+    --run-name pdg_extraction_new_run \
     --workers 4 \
     --timeout 600
 ```
@@ -313,14 +281,13 @@ entrano nel dataset dei PDG candidati per training. Il nome deriva dal CSV di
 input:
 
 ```text
-ansible.csv   -> ansible_rows_successfull_extracted.csv
-ansible-2.csv -> ansible-2_rows_successfull_extracted.csv
+input_dataset.csv -> input_dataset_rows_successfull_extracted.csv
 ```
 
 ### `pdg_file_level/`
 
-Contiene i grafi ordinati per repository, commit e file. Il percorso è compatibile
-con la struttura consolidata in `output/first_pdg_extraction`.
+Contiene i grafi ordinati per repository, commit e file sotto la directory della
+run, ad esempio `output/<run-name>/pdg_file_level`.
 
 ## Resume, restart e refresh dell'input
 
@@ -330,13 +297,13 @@ Rilanciare lo stesso comando con lo stesso `--run-name`:
 
 ```powershell
 docker run --rm -it `
-  -v "${PWD}\..\input\first_pdg_extraction\ansible.csv:/app/input/ansible.csv:ro" `
+  -v "${PWD}\..\output\second_pdg_extraction\input_dataset.csv:/app/input/input_dataset.csv:ro" `
   -v "${PWD}\..\output:/app/output" `
   pdg-file-level-extraction `
   scripts/pdg_file_level_extractor.py `
-    --input /app/input/ansible.csv `
+    --input /app/input/input_dataset.csv `
     --output-dir /app/output `
-    --run-name first_pdg_extraction `
+    --run-name pdg_extraction_new_run `
     --workers 4
 ```
 
@@ -435,11 +402,11 @@ Per validare la configurazione senza processare l'intero dataset:
 
 ```powershell
 docker run --rm -it `
-  -v "${PWD}\..\input\first_pdg_extraction\ansible.csv:/app/input/ansible.csv:ro" `
+  -v "${PWD}\..\output\second_pdg_extraction\input_dataset.csv:/app/input/input_dataset.csv:ro" `
   -v "${PWD}\..\output:/app/output" `
   pdg-file-level-extraction `
   scripts/pdg_file_level_extractor.py `
-    --input /app/input/ansible.csv `
+    --input /app/input/input_dataset.csv `
     --output-dir /app/output `
     --run-name pdg_extraction_smoke_test `
     --workers 2 `
@@ -459,9 +426,9 @@ Esempio:
 
 ```powershell
 python scripts/pdg_file_level_extractor.py `
-  --input ..\input\first_pdg_extraction\ansible.csv `
+  --input ..\output\second_pdg_extraction\input_dataset.csv `
   --output-dir ..\output `
-  --run-name first_pdg_extraction `
+  --run-name pdg_extraction_new_run `
   --workers 4
 ```
 
