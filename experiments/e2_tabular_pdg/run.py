@@ -5,6 +5,7 @@ import argparse
 from experiments.common.classical import run_tabular_experiment
 from experiments.common.config import add_common_args, apply_common_overrides, load_config, parse_list
 from experiments.common.feature_sets import e2_features
+from experiments.common.progress import get_logger
 from experiments.common.reporting import save_experiment_outputs, write_summary
 from experiments.common.reproducibility import set_global_seed
 from experiments.common.runner import prepare_common_run
@@ -29,9 +30,19 @@ def main() -> None:
         config["hyperparameter_search"] = True
     set_global_seed(int(config.get("seed", 42)))
     run_dir, df, splits, _ = prepare_common_run(config, args.run_name)
+    logger = get_logger("experiments.e2.run")
     features = e2_features(df, pdg_metrics=args.pdg_metrics, pdg_only=args.pdg_only)
     models = parse_list(args.models, ["random_forest"])
+    logger.info(
+        "E2: feature selezionate=%s pdg_metrics=%s pdg_only=%s modelli=%s split=%s",
+        len(features),
+        args.pdg_metrics,
+        args.pdg_only,
+        ",".join(models),
+        len(splits),
+    )
     if config.get("dry_run"):
+        logger.info("Dry run richiesto: training non eseguito")
         write_summary(run_dir, "E2 dry run", config)
         return
     predictions, metrics_rows, feature_manifest = run_tabular_experiment(
@@ -48,8 +59,8 @@ def main() -> None:
         model_features = feature_manifest[feature_manifest["model"].eq(model)] if not feature_manifest.empty else feature_manifest
         save_experiment_outputs(run_dir, "e2", model, model_predictions, model_metrics, model_features)
     write_summary(run_dir, "E2 Tabular PDG", config)
+    logger.info("E2 completato. Report: %s", run_dir / "reports" / "run_summary.md")
 
 
 if __name__ == "__main__":
     main()
-

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from experiments.common.evaluation import compute_binary_metrics
+from experiments.common.progress import get_logger, progress
 
 try:
     import torch
@@ -35,6 +36,7 @@ def run_gnn_model(
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     if torch is None or DataLoader is None:
         raise RuntimeError("PyTorch Geometric is not available")
+    logger = get_logger("experiments.e3_gnn.training")
     canonical = GNN_ALIASES.get(model_name.lower(), model_name.lower())
     device = _device(config.get("device", "auto"))
     in_channels = int(train_data[0].x.shape[1])
@@ -58,7 +60,26 @@ def run_gnn_model(
     best_path = model_dir / f"{canonical}_{split_id}_best.pt"
     patience = 0
     start = time.time()
-    for epoch in range(1, int(config.get("epochs", 100)) + 1):
+    max_epochs = int(config.get("epochs", 100))
+    log_every = max(1, int(config.get("log_every_epochs", 1)))
+    epoch_iter = progress(
+        range(1, max_epochs + 1),
+        total=max_epochs,
+        desc=f"{canonical}:{split_id}",
+        unit="epoch",
+        enabled=bool(config.get("progress", True)),
+    )
+    logger.info(
+        "E3/%s split=%s training avviato: train_graphs=%s val_graphs=%s test_graphs=%s device=%s epochs=%s",
+        canonical,
+        split_id,
+        len(train_data),
+        len(validation_data),
+        len(test_data),
+        device,
+        max_epochs,
+    )
+    for epoch in epoch_iter:
         train_loss = _train_epoch(model, train_loader, optimizer, criterion, device)
         val_pred = _predict(model, val_loader, device)
         val_metrics = compute_binary_metrics(val_pred["y_true"], val_pred["y_pred"], val_pred["y_score"])
@@ -71,7 +92,25 @@ def run_gnn_model(
             torch.save(model.state_dict(), best_path)
         else:
             patience += 1
+        if hasattr(epoch_iter, "set_postfix"):
+            epoch_iter.set_postfix(
+                loss=f"{train_loss:.4f}",
+                val_mcc=_format_metric(val_metrics.get("mcc")),
+                patience=patience,
+            )
+        if epoch == 1 or epoch % log_every == 0:
+            logger.info(
+                "E3/%s split=%s epoch=%s loss=%.4f val_mcc=%s val_auc_pr=%s patience=%s",
+                canonical,
+                split_id,
+                epoch,
+                train_loss,
+                _format_metric(val_metrics.get("mcc")),
+                _format_metric(val_metrics.get("auc_pr")),
+                patience,
+            )
         if patience >= int(config.get("early_stopping_patience", 10)):
+            logger.info("E3/%s split=%s early stopping a epoch=%s", canonical, split_id, epoch)
             break
     training_seconds = time.time() - start
     if best_path.exists():
@@ -91,6 +130,15 @@ def run_gnn_model(
         "epochs_ran": len(history),
         "best_validation_score": best_score if best_score != -np.inf else np.nan,
     })
+    logger.info(
+        "E3/%s split=%s test completato: mcc=%s auc_pr=%s f1=%s tempo=%.2fs",
+        canonical,
+        split_id,
+        _format_metric(metrics.get("mcc")),
+        _format_metric(metrics.get("auc_pr")),
+        _format_metric(metrics.get("f1")),
+        training_seconds,
+    )
     (model_dir / f"{canonical}_{split_id}_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
     predictions = pd.DataFrame({
         "repository": [getattr(data, "repository", "") for data in test_data],
@@ -156,3 +204,13 @@ def _device(value: str):
     if value == "cuda":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def _format_metric(value: object) -> str:
+    try:
+        val = float(value)
+        if val != val:
+            return "nan"
+        return f"{val:.4f}"
+    except Exception:
+        return "nan"

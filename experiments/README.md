@@ -100,6 +100,8 @@ Le metriche sono AUC-PR, AUC-ROC, MCC, precision, recall, F1, accuracy e contegg
 
 ## Smoke Test
 
+Le pipeline stampano log leggibili in console e salvano sempre una copia completa in `experiments/results/<run_name>/logs/run.log`. Le progress bar aggiornano la stessa riga quando il terminale lo supporta. Usa `--no-progress` per disattivarle, `--quiet` per scrivere solo su file e `--log-every-epochs N` per ridurre i log per epoca nelle GNN.
+
 E1 rapido:
 
 ```bash

@@ -16,6 +16,7 @@ from sklearn.tree import DecisionTreeClassifier
 from .balancing import balance_dataframe
 from .evaluation import compute_binary_metrics
 from .preprocessing import TabularPreprocessor
+from .progress import get_logger, progress
 from .splitting import Split, materialize_split
 
 
@@ -69,13 +70,33 @@ def run_tabular_experiment(
     experiment: str,
     config: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, List[Dict[str, Any]], pd.DataFrame]:
+    logger = get_logger(f"experiments.{experiment}.classical")
     all_predictions: List[pd.DataFrame] = []
     all_metrics: List[Dict[str, Any]] = []
     feature_rows: List[Dict[str, Any]] = []
+    show_progress = bool(config.get("progress", True))
+    logger.info(
+        "%s: avvio training tabellare con %s feature, %s modelli, %s split",
+        experiment.upper(),
+        len(feature_columns),
+        len(model_names),
+        len(splits),
+    )
     for model_name in model_names:
         canonical_model = MODEL_ALIASES.get(model_name.lower(), model_name.lower())
-        for split in splits:
+        logger.info("%s: modello %s", experiment.upper(), canonical_model)
+        for split in progress(splits, total=len(splits), desc=f"{experiment}:{canonical_model}", unit="split", enabled=show_progress):
             train_df, val_df, test_df = materialize_split(df, split)
+            logger.info(
+                "%s/%s split=%s repo=%s train=%s val=%s test=%s",
+                experiment,
+                canonical_model,
+                split.split_id,
+                split.repository,
+                len(train_df),
+                len(val_df),
+                len(test_df),
+            )
             balanced_train_df, balance_report = balance_dataframe(
                 train_df,
                 strategy=config.get("balance_strategy", "none"),
@@ -89,12 +110,14 @@ def run_tabular_experiment(
             )
             X_train, X_val, X_test, feature_manifest = preprocessor.fit_transform(balanced_train_df, val_df, test_df)
             if X_train.shape[1] == 0:
+                logger.warning("%s/%s split=%s saltato: nessuna feature dopo preprocessing", experiment, canonical_model, split.split_id)
                 continue
             y_train = balanced_train_df["failure_prone"].astype(int).to_numpy()
             y_val = val_df["failure_prone"].astype(int).to_numpy()
             y_test = test_df["failure_prone"].astype(int).to_numpy()
             model = _select_model(model_name, X_train, y_train, X_val, y_val, config)
             start = time.time()
+            logger.info("%s/%s split=%s fitting modello", experiment, canonical_model, split.split_id)
             model.fit(X_train, y_train)
             training_seconds = time.time() - start
             y_pred = model.predict(X_test).astype(int)
@@ -116,6 +139,16 @@ def run_tabular_experiment(
             })
             all_predictions.append(pred_df)
             all_metrics.append(metrics)
+            logger.info(
+                "%s/%s split=%s completato: mcc=%s auc_pr=%s f1=%s tempo=%.2fs",
+                experiment,
+                canonical_model,
+                split.split_id,
+                metrics.get("mcc"),
+                metrics.get("auc_pr"),
+                metrics.get("f1"),
+                training_seconds,
+            )
             for feature in feature_manifest["used_features"]:
                 feature_rows.append({"experiment": experiment, "model": canonical_model, "split_id": split.split_id, "feature": feature, "status": "used", "reason": ""})
             for removed in feature_manifest["removed_features"]:
@@ -187,4 +220,3 @@ def _prediction_frame(
         "y_pred": y_pred.tolist(),
         "y_score": y_score.tolist(),
     })
-

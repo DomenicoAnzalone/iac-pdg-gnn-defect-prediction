@@ -36,6 +36,10 @@ BASE_CONFIG: Dict[str, Any] = {
     "max_splits": None,
     "max_samples": None,
     "dry_run": False,
+    "quiet": False,
+    "progress": True,
+    "log_level": "INFO",
+    "log_every_epochs": 1,
 }
 
 
@@ -85,6 +89,10 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-splits", type=int)
     parser.add_argument("--max-samples", type=int)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--no-progress", action="store_true")
+    parser.add_argument("--log-level", default=None)
+    parser.add_argument("--log-every-epochs", type=int)
 
 
 def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
@@ -96,6 +104,8 @@ def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> 
         "max_repositories": "max_repositories",
         "max_splits": "max_splits",
         "max_samples": "max_samples",
+        "log_level": "log_level",
+        "log_every_epochs": "log_every_epochs",
     }
     for config_key, arg_key in mapping.items():
         value = getattr(args, arg_key, None)
@@ -103,5 +113,8 @@ def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> 
             config[config_key] = value
     if getattr(args, "dry_run", False):
         config["dry_run"] = True
+    if getattr(args, "quiet", False):
+        config["quiet"] = True
+    if getattr(args, "no_progress", False):
+        config["progress"] = False
     return config
-

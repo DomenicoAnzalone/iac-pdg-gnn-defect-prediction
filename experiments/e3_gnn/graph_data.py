@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+from experiments.common.progress import progress
 from experiments.e3_gnn.feature_engineering import GraphFeatureBuilder
 from experiments.e3_gnn.graph_loader import GraphLoader
 
@@ -81,10 +82,11 @@ class GraphDataBuilder:
             data.x = torch.tensor(scaler.transform(data.x.numpy()), dtype=torch.float32)
         return data_list
 
-    def build_partition(self, df: pd.DataFrame) -> Tuple[List[object], pd.DataFrame]:
+    def build_partition(self, df: pd.DataFrame, desc: str = "graphml", show_progress: bool = False) -> Tuple[List[object], pd.DataFrame]:
         data_list = []
         exclusions = []
-        for _, row in df.iterrows():
+        rows = list(df.iterrows())
+        for _, row in progress(rows, total=len(rows), desc=desc, unit="graph", enabled=show_progress):
             result = self.build_raw(row)
             if result.data is not None:
                 data_list.append(result.data)
