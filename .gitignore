@@ -13,3 +13,4 @@ rq4/
 /pdg_file_level_extraction/.test-deps/
 /docs/*
 !docs/THESIS_PROJECT_CONTEXT.md
+/experiments/results/*
