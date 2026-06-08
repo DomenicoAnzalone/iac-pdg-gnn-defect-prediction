@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import time
 
 import pandas as pd
 
 from experiments.common.balancing import balance_sequence
 from experiments.common.config import add_common_args, apply_common_overrides, load_config, parse_list
-from experiments.common.progress import get_logger
+from experiments.common.progress import get_logger, progress
 from experiments.common.reporting import save_experiment_outputs, write_summary
 from experiments.common.reproducibility import set_global_seed
 from experiments.common.runner import prepare_common_run
@@ -52,6 +53,16 @@ def main() -> None:
         len(df),
         config.get("progress", True),
     )
+    logger.info(
+        "E3 pronto: modelli=%s split_validi=%s device=%s epochs=%s batch_size=%s. Dettagli completi in %s",
+        ",".join(models),
+        len(splits),
+        config.get("device", "auto"),
+        config.get("epochs", 100),
+        config.get("batch_size", 32),
+        run_dir / "logs" / "run.log",
+        extra={"console": True},
+    )
     if config.get("dry_run"):
         logger.info("Dry run richiesto: training non eseguito")
         write_summary(run_dir, "E3 dry run", config)
@@ -65,9 +76,22 @@ def main() -> None:
     for model in models:
         canonical = GNN_ALIASES.get(model.lower(), model.lower())
         logger.info("E3: avvio modello %s", canonical)
+        logger.info("Training E3/%s avviato", canonical, extra={"console": True})
         model_predictions = []
         model_metrics = []
-        for split_index, split in enumerate(splits, start=1):
+        model_start = time.time()
+        split_times = []
+        split_iter = progress(
+            list(enumerate(splits, start=1)),
+            total=len(splits),
+            desc="Split",
+            unit="split",
+            enabled=bool(config.get("progress", True)) and bool(config.get("compact_progress", False)),
+            leave=True,
+            position=0,
+        )
+        for split_index, split in split_iter:
+            split_start = time.time()
             train_df, val_df, test_df = materialize_split(df, split)
             logger.info(
                 "E3/%s split %s/%s split_id=%s repo=%s: righe train=%s val=%s test=%s",
@@ -80,9 +104,10 @@ def main() -> None:
                 len(val_df),
                 len(test_df),
             )
-            train_data, train_ex = builder.build_partition(train_df, desc=f"load train {split.split_id}", show_progress=bool(config.get("progress", True)))
-            val_data, val_ex = builder.build_partition(val_df, desc=f"load val {split.split_id}", show_progress=bool(config.get("progress", True)))
-            test_data, test_ex = builder.build_partition(test_df, desc=f"load test {split.split_id}", show_progress=bool(config.get("progress", True)))
+            show_graph_progress = bool(config.get("progress", True)) and not bool(config.get("compact_progress", False))
+            train_data, train_ex = builder.build_partition(train_df, desc=f"load train {split.split_id}", show_progress=show_graph_progress)
+            val_data, val_ex = builder.build_partition(val_df, desc=f"load val {split.split_id}", show_progress=show_graph_progress)
+            test_data, test_ex = builder.build_partition(test_df, desc=f"load test {split.split_id}", show_progress=show_graph_progress)
             all_graph_exclusions.extend([train_ex, val_ex, test_ex])
             if not train_data or not val_data or not test_data or len({int(data.y.item()) for data in train_data}) < 2:
                 logger.warning(
@@ -94,6 +119,8 @@ def main() -> None:
                     len(test_data),
                     sorted({int(data.y.item()) for data in train_data}) if train_data else [],
                 )
+                if hasattr(split_iter, "set_postfix"):
+                    split_iter.set_postfix(repo=_short_repo(split.repository), status="skipped")
                 continue
             logger.info(
                 "E3/%s split=%s grafi caricati: train=%s val=%s test=%s esclusioni=%s",
@@ -136,15 +163,46 @@ def main() -> None:
             metrics["balance_after"] = str(balance_report["after"])
             model_predictions.append(predictions)
             model_metrics.append(metrics)
+            split_seconds = time.time() - split_start
+            split_times.append(split_seconds)
+            if hasattr(split_iter, "set_postfix"):
+                split_iter.set_postfix(
+                    repo=_short_repo(split.repository),
+                    mcc=_format_metric(metrics.get("mcc")),
+                    auc_pr=_format_metric(metrics.get("auc_pr")),
+                    avg=f"{sum(split_times) / len(split_times):.1f}s",
+                )
         predictions_df = pd.concat(model_predictions, ignore_index=True) if model_predictions else pd.DataFrame()
         save_experiment_outputs(run_dir, "e3", canonical, predictions_df, model_metrics, None)
         logger.info("E3/%s output salvati: predizioni=%s split_metriche=%s", canonical, len(predictions_df), len(model_metrics))
+        logger.info(
+            "Training E3/%s completato: split_metriche=%s predizioni=%s tempo=%.1fs",
+            canonical,
+            len(model_metrics),
+            len(predictions_df),
+            time.time() - model_start,
+            extra={"console": True},
+        )
     if all_graph_exclusions:
         graph_ex = pd.concat([ex for ex in all_graph_exclusions if ex is not None and not ex.empty], ignore_index=True) if any(not ex.empty for ex in all_graph_exclusions if ex is not None) else pd.DataFrame()
         if not graph_ex.empty:
             graph_ex.to_csv(run_dir / "logs" / "graph_exclusions.csv", index=False)
     write_summary(run_dir, "E3 GNN", config)
-    logger.info("E3 completato. Report: %s", run_dir / "reports" / "run_summary.md")
+    logger.info("E3 completato. Report: %s", run_dir / "reports" / "run_summary.md", extra={"console": True})
+
+
+def _short_repo(repository: str, max_len: int = 28) -> str:
+    return repository if len(repository) <= max_len else "..." + repository[-(max_len - 3):]
+
+
+def _format_metric(value: object) -> str:
+    try:
+        val = float(value)
+        if val != val:
+            return "nan"
+        return f"{val:.3f}"
+    except Exception:
+        return "nan"
 
 
 if __name__ == "__main__":

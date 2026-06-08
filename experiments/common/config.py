@@ -40,6 +40,7 @@ BASE_CONFIG: Dict[str, Any] = {
     "progress": True,
     "log_level": "INFO",
     "log_every_epochs": 1,
+    "compact_progress": False,
 }
 
 
@@ -93,6 +94,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-progress", action="store_true")
     parser.add_argument("--log-level", default=None)
     parser.add_argument("--log-every-epochs", type=int)
+    parser.add_argument("--compact-progress", action="store_true")
 
 
 def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
@@ -117,4 +119,7 @@ def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> 
         config["quiet"] = True
     if getattr(args, "no_progress", False):
         config["progress"] = False
+    if getattr(args, "compact_progress", False):
+        config["compact_progress"] = True
+        config["progress"] = True
     return config

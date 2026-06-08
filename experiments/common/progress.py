@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, TypeVar
+from typing import Iterable, Optional, TypeVar
 
 T = TypeVar("T")
 
 
-def setup_logging(run_dir: Path, level: str = "INFO", quiet: bool = False) -> None:
+def setup_logging(run_dir: Path, level: str = "INFO", quiet: bool = False, console_mode: str = "standard") -> None:
     log_dir = run_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     root = logging.getLogger()
@@ -25,6 +25,8 @@ def setup_logging(run_dir: Path, level: str = "INFO", quiet: bool = False) -> No
         stream_handler = TqdmLoggingHandler()
         stream_handler.setFormatter(formatter)
         stream_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
+        if console_mode == "compact":
+            stream_handler.addFilter(CompactConsoleFilter())
         root.addHandler(stream_handler)
 
 
@@ -50,6 +52,11 @@ class TqdmLoggingHandler(logging.StreamHandler):
             self.handleError(record)
 
 
+class CompactConsoleFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return bool(getattr(record, "console", False))
+
+
 def progress(
     iterable: Iterable[T],
     *,
@@ -58,6 +65,7 @@ def progress(
     unit: str = "it",
     enabled: bool = True,
     leave: bool = False,
+    position: Optional[int] = None,
 ) -> Iterable[T]:
     if not enabled:
         return iterable
@@ -70,6 +78,8 @@ def progress(
             desc=desc,
             unit=unit,
             leave=leave,
+            position=position,
+            file=sys.stdout,
             dynamic_ncols=True,
             mininterval=0.5,
             smoothing=0.1,

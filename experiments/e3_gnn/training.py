@@ -62,12 +62,15 @@ def run_gnn_model(
     start = time.time()
     max_epochs = int(config.get("epochs", 100))
     log_every = max(1, int(config.get("log_every_epochs", 1)))
+    compact_progress = bool(config.get("compact_progress", False))
     epoch_iter = progress(
         range(1, max_epochs + 1),
         total=max_epochs,
-        desc=f"{canonical}:{split_id}",
+        desc="Epoch",
         unit="epoch",
         enabled=bool(config.get("progress", True)),
+        leave=False,
+        position=1 if compact_progress else None,
     )
     logger.info(
         "E3/%s split=%s training avviato: train_graphs=%s val_graphs=%s test_graphs=%s device=%s epochs=%s",
@@ -95,8 +98,9 @@ def run_gnn_model(
         if hasattr(epoch_iter, "set_postfix"):
             epoch_iter.set_postfix(
                 loss=f"{train_loss:.4f}",
+                best=_format_metric(best_score if best_score != -np.inf else score_value),
                 val_mcc=_format_metric(val_metrics.get("mcc")),
-                patience=patience,
+                patience=f"{patience}/{int(config.get('early_stopping_patience', 10))}",
             )
         if epoch == 1 or epoch % log_every == 0:
             logger.info(
