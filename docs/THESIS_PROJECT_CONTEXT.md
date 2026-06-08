@@ -373,7 +373,7 @@ minima vengono esclusi? La risposta dovrà essere valutata sugli stessi split,
 con lo stesso preprocessing e con lo stesso protocollo usato per E1, E2 ed E3,
 in modo da non confondere l'effetto della soglia con differenze di validazione.
 
-Il report umano della versione è:
+Il report della versione è:
 
 ```text
 datasets/ansible-pdg-defect-dataset/final/v2026-06-06/DATASET_REPORT.md
