@@ -1,0 +1,20 @@
+{
+  "model": "graphsage",
+  "balance_strategy": "random_oversampling",
+  "min_nodes": 3,
+  "min_edges": 2,
+  "epochs": 100,
+  "batch_size": 32,
+  "hidden_channels": 64,
+  "num_layers": 2,
+  "dropout": 0.5,
+  "lr": 0.001,
+  "weight_decay": 0.0,
+  "pooling": "mean",
+  "early_stopping_patience": 10,
+  "early_stopping_metric": "mcc",
+  "class_weights": false,
+  "device": "auto",
+  "seed": 42
+}
+
