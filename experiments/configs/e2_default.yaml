@@ -1,0 +1,11 @@
+{
+  "models": ["random_forest"],
+  "pdg_metrics": "all",
+  "balance_strategy": "random_oversampling",
+  "scaler": "standard",
+  "feature_selection": "none",
+  "min_nodes": 3,
+  "min_edges": 2,
+  "seed": 42
+}
+
