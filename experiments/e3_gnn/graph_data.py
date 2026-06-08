@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from gnn.preprocessing.feature_engineering import GraphFeatureBuilder
-from gnn.preprocessing.graph_loader import GraphLoader
+from experiments.e3_gnn.feature_engineering import GraphFeatureBuilder
+from experiments.e3_gnn.graph_loader import GraphLoader
 
 try:
     import torch
@@ -122,4 +122,3 @@ class GraphDataBuilder:
             "edges": row.get("edges"),
             "reason": reason,
         }
-

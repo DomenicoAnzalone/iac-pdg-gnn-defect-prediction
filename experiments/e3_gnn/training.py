@@ -17,7 +17,7 @@ except Exception:  # pragma: no cover
     torch = None
     DataLoader = None
 
-from gnn.models import get_model
+from experiments.e3_gnn.models import get_model
 
 
 GNN_ALIASES = {"gcn": "gcn", "graphsage": "graphsage", "sage": "graphsage", "gat": "gat", "gin": "gin", "rgcn": "rgcn", "r-gcn": "rgcn"}

@@ -19,7 +19,7 @@ l'output di una fase diventa l'input della fase successiva.
 radon_dataset_extraction
   -> pdg_file_level_extraction
   -> dataset_preparation
-  -> gnn
+  -> experiments
 ```
 
 `docs`, `datasets` e `output` supportano questa pipeline: conservano contesto,
@@ -72,14 +72,15 @@ datasets/ansible-pdg-defect-dataset/final/v2026-06-06/
 Qui si trovano il CSV finale, le metriche PDG calcolate, le esclusioni, il report
 umano e il manifest JSON.
 
-### `gnn/`
+### `experiments/`
 
-Macro-fase 4. Contiene preprocessing dei grafi, split, bilanciamento, modelli,
-training ed evaluation per gli esperimenti GNN e le baseline.
+Macro-fase 4. Contiene le pipeline finali per E1, E2 ed E3, con moduli comuni
+per split walk-forward, preprocessing, bilanciamento, training, evaluation,
+reporting e confronto dei risultati.
 
-Questa fase dovrà usare il dataset finale prodotto da `dataset_preparation`.
-Nella fase sperimentale finale dovrà includere anche la sensitivity analysis sui
-grafi piccoli descritta nei documenti di tesi.
+Questa fase usa il dataset finale prodotto da `dataset_preparation` e include
+anche la small-graph sensitivity analysis sui grafi piccoli descritta nei
+documenti di tesi.
 
 ### `output/`
 
@@ -93,6 +94,6 @@ esperimenti: per quello usare `datasets/`.
 2. Usare `radon_dataset_extraction/` per generare o aggiornare il dataset RADON.
 3. Usare `pdg_file_level_extraction/` per estrarre i PDG file-level.
 4. Usare `dataset_preparation/` per creare una versione finale del dataset.
-5. Usare `gnn/` per training, valutazione e confronto sperimentale.
+5. Usare `experiments/` per training, valutazione e confronto sperimentale.
 
 Ogni cartella ha un README dedicato con dettagli specifici della fase.
