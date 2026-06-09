@@ -17,7 +17,7 @@ Input di default:
 datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv
 ```
 
-La pipeline si aspetta `repository`, `commit`, `filepath`, `committed_at`, `failure_prone`, `graphml_local_path` oppure `graphml_path`, le colonne di dimensione del grafo `nodes` ed `edges`, e le 11 metriche PDG:
+La pipeline si aspetta `repository`, `commit`, `filepath`, `committed_at`, `failure_prone`, `graphml_local_path` oppure `graphml_path`, le colonne di dimensione del grafo `nodes` ed `edges`, e le 11 metriche PDG disponibili nel dataset:
 
 ```text
 maxPdgVertices, lackOfCohesion, verticesCount, edgesCount, edgesToVerticesRatio,
@@ -42,7 +42,7 @@ Validation e test non vengono mai bilanciati. Imputation, scaling e feature filt
 
 ## Preprocessing
 
-E1/E2 usano median imputation, rimozione opzionale delle feature costanti, scaling configurabile (`none`, `min-max`, `standard`) e uno slot configurabile per feature selection (`none`, `variance_threshold`). E1 esclude identificativi, label, path dei grafi, colonne ausiliarie sulla dimensione del grafo e metriche PDG. E2 aggiunge di default tutte le 11 metriche PDG, oppure un sottoinsieme separato da virgole tramite `--pdg-metrics`.
+E1/E2 usano median imputation, rimozione opzionale delle feature costanti, scaling configurabile (`none`, `min-max`, `standard`) e feature selection configurabile (`none`, `variance_threshold`, `rfe`, `rfecv`). E1 esclude identificativi, label, path dei grafi, colonne ausiliarie sulla dimensione del grafo e metriche PDG. E2 aggiunge di default tutte le 11 metriche PDG come candidate e usa RFECV train-only per selezionare le feature più utili in ogni split. Gli alias `top4` e `top5` restano disponibili per analisi secondarie.
 
 E3 carica GraphML con parsing deterministico tramite NetworkX e crea feature nodali per indicatore di task, gradi, tipo di nodo, semplici feature testuali della label, numero di attributi e presenza di informazioni di posizione. Crea `edge_type` per R-GCN e ignora gli edge type nei modelli che non li usano. Lo scaling delle node feature viene appreso solo sui grafi di training.
 
@@ -91,12 +91,14 @@ excluded_samples.csv
 predictions/*_predictions.csv
 metrics/per_split_metrics.csv
 metrics/per_repository_metrics.csv
+metrics/pooled_metrics.csv
+metrics/per_repository_pooled_metrics.csv
 metrics/aggregated_metrics.csv
 logs/skipped_splits.csv
 reports/run_summary.md
 ```
 
-Le metriche sono AUC-PR, AUC-ROC, MCC, precision, recall, F1, accuracy e conteggi della confusion matrix. I casi in cui AUC/MCC non sono definiti vengono salvati come `NaN` con warning.
+Le metriche sono AUC-PR, AUC-ROC, MCC, precision, recall, F1, accuracy e conteggi della confusion matrix. I risultati principali sono in `pooled_metrics.csv`: la pipeline aggrega prima tutte le predizioni dei test walk-forward e poi calcola le metriche sul totale. Le medie per split restano in `aggregated_metrics.csv` come diagnostica. I casi in cui AUC/MCC non sono definiti vengono salvati come `NaN` con warning.
 
 ## Smoke Test
 
@@ -135,7 +137,7 @@ python -m experiments.e1_tabular_baseline.run --config experiments/configs/e1_de
 E2:
 
 ```bash
-python -m experiments.e2_tabular_pdg.run --config experiments/configs/e2_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-name e2_pdg_all_metrics --pdg-metrics all --models random_forest,svm,logistic_regression --balance random_oversampling --scaler standard --seed 42
+python -m experiments.e2_tabular_pdg.run --config experiments/configs/e2_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-name e2_pdg_all_rfecv --pdg-metrics all --models random_forest,svm,logistic_regression --balance random_oversampling --scaler standard --seed 42
 ```
 
 E3:
@@ -166,7 +168,6 @@ La sensitivity sul training si esegue ripetendo E1/E2/E3 con valori diversi di `
 
 ## Limiti Noti
 
-- Il protocollo derivato dai PDF è codificato a partire dal contesto del progetto e dalle note implementative locali disponibili; durante l'implementazione l'ambiente non aveva una libreria per estrarre testo dai PDF.
-- RFECV/RFE è presente come slot di configurazione, ma non è abilitato nella pipeline veloce di default.
+- E2 usa tutte le 11 metriche PDG come candidate e RFECV come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.
 - Il confronto statistico include al momento sintesi descrittive e Wilcoxon paired; Friedman/Nemenyi può essere aggiunto usando la tabella per split già salvata.
 - La pipeline finale per E1/E2/E3 è sotto `experiments/`; non dipende da una cartella legacy esterna.

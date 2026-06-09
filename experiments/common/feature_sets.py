@@ -42,6 +42,23 @@ PDG_METRICS = [
     "indirectFanOut",
 ]
 
+PDG_METRICS_TOP4 = [
+    "maxPdgVertices",
+    "verticesCount",
+    "edgesToVerticesRatio",
+    "edgesCount",
+]
+
+PDG_METRICS_TOP5 = [*PDG_METRICS_TOP4, "globalInput"]
+
+PDG_METRIC_ALIASES: Dict[str, List[str]] = {
+    "all": PDG_METRICS,
+    "top4": PDG_METRICS_TOP4,
+    "iuliano_top4": PDG_METRICS_TOP4,
+    "best_pdg": PDG_METRICS_TOP4,
+    "top5": PDG_METRICS_TOP5,
+}
+
 PDG_AUX_COLUMNS = {
     "nodes",
     "edges",
@@ -79,8 +96,9 @@ def e2_features(df: pd.DataFrame, pdg_metrics: Sequence[str] | str = "all", pdg_
 
 def resolve_pdg_metrics(pdg_metrics: Sequence[str] | str = "all") -> List[str]:
     if isinstance(pdg_metrics, str):
-        if pdg_metrics.lower() == "all":
-            return list(PDG_METRICS)
+        alias = pdg_metrics.lower()
+        if alias in PDG_METRIC_ALIASES:
+            return list(PDG_METRIC_ALIASES[alias])
         requested = [item.strip() for item in pdg_metrics.split(",") if item.strip()]
     else:
         requested = list(pdg_metrics)
@@ -88,4 +106,3 @@ def resolve_pdg_metrics(pdg_metrics: Sequence[str] | str = "all") -> List[str]:
     if unknown:
         raise ValueError(f"Unknown PDG metrics: {unknown}. Available: {PDG_METRICS}")
     return requested
-

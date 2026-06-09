@@ -25,6 +25,10 @@ BASE_CONFIG: Dict[str, Any] = {
     "balance_strategy": "none",
     "scaler": "standard",
     "feature_selection": "none",
+    "rfecv_cv": 3,
+    "rfecv_step": 0.1,
+    "rfecv_min_features_to_select": 1,
+    "rfe_n_features_to_select": None,
     "remove_constant_features": True,
     "model_selection_scoring": "mcc",
     "hyperparameter_search": False,
@@ -95,6 +99,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--log-level", default=None)
     parser.add_argument("--log-every-epochs", type=int)
     parser.add_argument("--compact-progress", action="store_true")
+    parser.add_argument("--feature-selection", choices=["none", "variance_threshold", "rfe", "rfecv"])
 
 
 def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
@@ -108,6 +113,7 @@ def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> 
         "max_samples": "max_samples",
         "log_level": "log_level",
         "log_every_epochs": "log_every_epochs",
+        "feature_selection": "feature_selection",
     }
     for config_key, arg_key in mapping.items():
         value = getattr(args, arg_key, None)

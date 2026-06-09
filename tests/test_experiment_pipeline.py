@@ -6,7 +6,7 @@ import pandas as pd
 
 from experiments.common.balancing import balance_dataframe
 from experiments.common.data_loading import filter_common_valid_samples, load_dataset
-from experiments.common.feature_sets import e1_features, e2_features
+from experiments.common.feature_sets import PDG_METRICS, e1_features, e2_features
 from experiments.common.splitting import assert_no_overlap, create_walk_forward_splits, materialize_split
 from experiments.e3_gnn.graph_data import GraphDataBuilder
 
@@ -21,7 +21,7 @@ def test_dataset_schema_and_feature_sets():
     e2 = e2_features(df)
     assert e1
     assert set(e1).issubset(set(e2))
-    assert "maxPdgVertices" in e2
+    assert all(metric in e2 for metric in PDG_METRICS)
 
 
 def test_walk_forward_splits_no_overlap_and_temporal_order():
@@ -58,4 +58,3 @@ def test_graphml_batch_loads():
     assert data
     assert data[0].x.shape[0] >= 3
     assert data[0].edge_index.shape[0] == 2
-

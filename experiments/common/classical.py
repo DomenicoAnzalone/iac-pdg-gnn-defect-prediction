@@ -102,19 +102,30 @@ def run_tabular_experiment(
                 strategy=config.get("balance_strategy", "none"),
                 seed=int(config.get("seed", 42)),
             )
+            y_train = balanced_train_df["failure_prone"].astype(int).to_numpy()
+            y_val = val_df["failure_prone"].astype(int).to_numpy()
+            y_test = test_df["failure_prone"].astype(int).to_numpy()
             preprocessor = TabularPreprocessor(
                 feature_columns=feature_columns,
                 scaler=config.get("scaler", "standard"),
                 feature_selection=config.get("feature_selection", "none"),
                 remove_constant_features=bool(config.get("remove_constant_features", True)),
+                seed=int(config.get("seed", 42)),
+                n_jobs=int(config.get("n_jobs", -1)),
+                rfecv_cv=int(config.get("rfecv_cv", 3)),
+                rfecv_step=config.get("rfecv_step", 1),
+                rfecv_min_features_to_select=int(config.get("rfecv_min_features_to_select", 1)),
+                rfe_n_features_to_select=config.get("rfe_n_features_to_select"),
             )
-            X_train, X_val, X_test, feature_manifest = preprocessor.fit_transform(balanced_train_df, val_df, test_df)
+            X_train, X_val, X_test, feature_manifest = preprocessor.fit_transform(
+                balanced_train_df,
+                val_df,
+                test_df,
+                y_train=y_train,
+            )
             if X_train.shape[1] == 0:
                 logger.warning("%s/%s split=%s saltato: nessuna feature dopo preprocessing", experiment, canonical_model, split.split_id)
                 continue
-            y_train = balanced_train_df["failure_prone"].astype(int).to_numpy()
-            y_val = val_df["failure_prone"].astype(int).to_numpy()
-            y_test = test_df["failure_prone"].astype(int).to_numpy()
             model = _select_model(model_name, X_train, y_train, X_val, y_val, config)
             start = time.time()
             logger.info("%s/%s split=%s fitting modello", experiment, canonical_model, split.split_id)
@@ -153,6 +164,16 @@ def run_tabular_experiment(
                 feature_rows.append({"experiment": experiment, "model": canonical_model, "split_id": split.split_id, "feature": feature, "status": "used", "reason": ""})
             for removed in feature_manifest["removed_features"]:
                 feature_rows.append({"experiment": experiment, "model": canonical_model, "split_id": split.split_id, "feature": removed["feature"], "status": "removed", "reason": removed["reason"]})
+            details = feature_manifest.get("feature_selection_details", {})
+            if details:
+                feature_rows.append({
+                    "experiment": experiment,
+                    "model": canonical_model,
+                    "split_id": split.split_id,
+                    "feature": "__feature_selection__",
+                    "status": str(details.get("status", "")),
+                    "reason": str(details),
+                })
     predictions = pd.concat(all_predictions, ignore_index=True) if all_predictions else pd.DataFrame()
     return predictions, all_metrics, pd.DataFrame(feature_rows)
 

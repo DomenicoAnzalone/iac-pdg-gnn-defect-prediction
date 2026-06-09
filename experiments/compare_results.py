@@ -20,7 +20,9 @@ def main() -> None:
     if not per_split_path.exists():
         raise FileNotFoundError(f"Missing per-split metrics: {per_split_path}")
     per_split = pd.read_csv(per_split_path)
-    summary = build_comparison(per_split, args.metric)
+    pooled_path = results_dir / "metrics" / "pooled_metrics.csv"
+    pooled = pd.read_csv(pooled_path) if pooled_path.exists() else None
+    summary = build_comparison(per_split, args.metric, pooled)
     out_csv = results_dir / "reports" / "comparison_summary.csv"
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(out_csv, index=False)
@@ -28,16 +30,23 @@ def main() -> None:
     out_md.write_text(render_markdown(summary, args.metric), encoding="utf-8")
 
 
-def build_comparison(per_split: pd.DataFrame, metric: str) -> pd.DataFrame:
+def build_comparison(per_split: pd.DataFrame, metric: str, pooled: pd.DataFrame | None = None) -> pd.DataFrame:
     rows: List[Dict[str, object]] = []
     systems = sorted(per_split[["experiment", "model"]].drop_duplicates().itertuples(index=False, name=None))
     for exp, model in systems:
         vals = per_split[(per_split["experiment"] == exp) & (per_split["model"] == model)][metric].dropna()
+        pooled_value = ""
+        pooled_col = f"pooled_{metric}"
+        if pooled is not None and pooled_col in pooled.columns:
+            match = pooled[(pooled["experiment"] == exp) & (pooled["model"] == model)]
+            if not match.empty:
+                pooled_value = match.iloc[0][pooled_col]
         rows.append({
             "comparison": "single",
             "left": f"{exp}:{model}",
             "right": "",
             "metric": metric,
+            "left_pooled": pooled_value,
             "left_mean": vals.mean(),
             "right_mean": "",
             "mean_delta_left_minus_right": "",
@@ -59,6 +68,7 @@ def build_comparison(per_split: pd.DataFrame, metric: str) -> pd.DataFrame:
             "left": f"{left_exp}:{left_model}",
             "right": f"{right_exp}:{right_model}",
             "metric": metric,
+            "left_pooled": "",
             "left_mean": paired["left_metric"].mean() if not paired.empty else "",
             "right_mean": paired["right_metric"].mean() if not paired.empty else "",
             "mean_delta_left_minus_right": (paired["left_metric"] - paired["right_metric"]).mean() if not paired.empty else "",
@@ -78,6 +88,8 @@ def render_markdown(summary: pd.DataFrame, metric: str) -> str:
         "",
         f"Metric used for comparison: `{metric}`.",
         "",
+        "Single-system rows report pooled metrics when `metrics/pooled_metrics.csv` is available. Paired rows use split-level values for Wilcoxon diagnostics.",
+        "",
         table,
         "",
         "Wilcoxon signed-rank tests are computed only for paired split-level results with at least two non-identical pairs.",
@@ -86,4 +98,3 @@ def render_markdown(summary: pd.DataFrame, metric: str) -> str:
 
 if __name__ == "__main__":
     main()
-

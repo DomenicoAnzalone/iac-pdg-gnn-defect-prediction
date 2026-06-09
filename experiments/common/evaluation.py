@@ -51,6 +51,17 @@ def aggregate_metrics(metrics_rows: List[Dict[str, object]]) -> Dict[str, object
         vals = [float(row[metric]) for row in metrics_rows if row.get(metric) == row.get(metric)]
         result[f"{metric}_mean"] = float(np.mean(vals)) if vals else math.nan
         result[f"{metric}_median"] = float(np.median(vals)) if vals else math.nan
+        result[f"{metric}_nan_count"] = sum(1 for row in metrics_rows if row.get(metric) != row.get(metric))
     result["split_count"] = len(metrics_rows)
     return result
 
+
+def pooled_metrics_from_predictions(predictions: object) -> Dict[str, object]:
+    """Compute final metrics after pooling all test predictions together."""
+    if not hasattr(predictions, "__getitem__") or len(predictions) == 0:  # type: ignore[arg-type]
+        return {}
+    y_true = predictions["y_true"].astype(int).tolist()
+    y_pred = predictions["y_pred"].astype(int).tolist()
+    y_score = predictions["y_score"].astype(float).tolist() if "y_score" in predictions else None
+    metrics = compute_binary_metrics(y_true, y_pred, y_score)
+    return {f"pooled_{key}": value for key, value in metrics.items()} | {"pooled_sample_count": len(y_true)}

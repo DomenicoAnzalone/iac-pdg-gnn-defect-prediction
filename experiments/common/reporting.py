@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterable, List
 
 import pandas as pd
 
-from .evaluation import aggregate_metrics
+from .evaluation import aggregate_metrics, pooled_metrics_from_predictions
 from .reproducibility import metadata, write_json
 
 
@@ -86,19 +86,66 @@ def rebuild_aggregates(run_dir: Path) -> None:
         .reset_index()
     )
     repo.to_csv(run_dir / "metrics" / "per_repository_metrics.csv", index=False)
+    pooled_by_key = _build_pooled_metrics(run_dir)
     agg_rows = []
     for (experiment, model), group in per_split.groupby(["experiment", "model"]):
         row = {"experiment": experiment, "model": model}
         row.update(aggregate_metrics(group.to_dict("records")))
+        row.update(pooled_by_key.get((str(experiment), str(model)), {}))
         agg_rows.append(row)
     pd.DataFrame(agg_rows).to_csv(run_dir / "metrics" / "aggregated_metrics.csv", index=False)
+
+
+def _build_pooled_metrics(run_dir: Path) -> Dict[tuple[str, str], Dict[str, Any]]:
+    prediction_files = sorted((run_dir / "predictions").glob("*_predictions.csv"))
+    rows: List[Dict[str, Any]] = []
+    repo_rows: List[Dict[str, Any]] = []
+    for path in prediction_files:
+        predictions = pd.read_csv(path)
+        if predictions.empty or not {"experiment", "model", "y_true", "y_pred"}.issubset(predictions.columns):
+            continue
+        for (experiment, model), group in predictions.groupby(["experiment", "model"], dropna=False):
+            row: Dict[str, Any] = {"experiment": str(experiment), "model": str(model)}
+            row.update(pooled_metrics_from_predictions(group))
+            rows.append(row)
+        for (experiment, model, repository), group in predictions.groupby(["experiment", "model", "repository"], dropna=False):
+            row = {"experiment": str(experiment), "model": str(model), "repository": str(repository)}
+            row.update(pooled_metrics_from_predictions(group))
+            repo_rows.append(row)
+    if rows:
+        pooled = pd.DataFrame(rows).drop_duplicates(subset=["experiment", "model"], keep="last")
+        pooled.to_csv(run_dir / "metrics" / "pooled_metrics.csv", index=False)
+        if repo_rows:
+            pd.DataFrame(repo_rows).drop_duplicates(
+                subset=["experiment", "model", "repository"],
+                keep="last",
+            ).to_csv(run_dir / "metrics" / "per_repository_pooled_metrics.csv", index=False)
+        return {
+            (str(row["experiment"]), str(row["model"])): {
+                key: value
+                for key, value in row.items()
+                if key not in {"experiment", "model"}
+            }
+            for row in pooled.to_dict("records")
+        }
+    return {}
 
 
 def write_summary(run_dir: Path, title: str, config: Dict[str, Any]) -> None:
     agg_path = run_dir / "metrics" / "aggregated_metrics.csv"
     lines = [f"# {title}", "", f"- Dataset: `{config.get('dataset')}`", f"- Seed: `{config.get('seed')}`"]
     if agg_path.exists():
-        lines.extend(["", "## Aggregated metrics", ""])
+        lines.extend(["", "## Final pooled metrics", ""])
+        pooled_path = run_dir / "metrics" / "pooled_metrics.csv"
+        if pooled_path.exists():
+            pooled = pd.read_csv(pooled_path)
+            try:
+                lines.append(pooled.to_markdown(index=False))
+            except Exception:
+                lines.append("```")
+                lines.append(pooled.to_csv(index=False))
+                lines.append("```")
+        lines.extend(["", "## Per-split aggregate diagnostics", ""])
         agg = pd.read_csv(agg_path)
         try:
             lines.append(agg.to_markdown(index=False))
