@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from experiments.common.evaluation import compute_binary_metrics
-from experiments.common.progress import get_logger, progress
+from experiments.common.progress import CompactStatusLine, get_logger, progress
 
 try:
     import torch
@@ -33,6 +33,9 @@ def run_gnn_model(
     repository: str,
     config: Dict[str, Any],
     model_dir: Path,
+    compact_status: CompactStatusLine | None = None,
+    split_index: int | None = None,
+    total_splits: int | None = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     if torch is None or DataLoader is None:
         raise RuntimeError("PyTorch Geometric is not available")
@@ -63,15 +66,19 @@ def run_gnn_model(
     max_epochs = int(config.get("epochs", 100))
     log_every = max(1, int(config.get("log_every_epochs", 1)))
     compact_progress = bool(config.get("compact_progress", False))
-    epoch_iter = progress(
-        range(1, max_epochs + 1),
-        total=max_epochs,
-        desc="Epoch",
-        unit="epoch",
-        enabled=bool(config.get("progress", True)),
-        leave=False,
-        position=1 if compact_progress else None,
-    )
+    if compact_progress:
+        epoch_iter = range(1, max_epochs + 1)
+    else:
+        epoch_iter = progress(
+            range(1, max_epochs + 1),
+            total=max_epochs,
+            desc="Epoch",
+            unit="epoch",
+            enabled=bool(config.get("progress", True)),
+            leave=False,
+            position=None,
+            dynamic_ncols=True,
+        )
     logger.info(
         "E3/%s split=%s training avviato: train_graphs=%s val_graphs=%s test_graphs=%s device=%s epochs=%s",
         canonical,
@@ -95,12 +102,21 @@ def run_gnn_model(
             torch.save(model.state_dict(), best_path)
         else:
             patience += 1
-        if hasattr(epoch_iter, "set_postfix"):
-            epoch_iter.set_postfix(
-                loss=f"{train_loss:.4f}",
+        if compact_progress and compact_status is not None and split_index is not None:
+            compact_status.update(
+                split_index=split_index,
+                completed_splits=max(0, split_index - 1),
+                epoch=epoch,
+                total_epochs=max_epochs,
+                loss=f"{train_loss:.3f}",
                 best=_format_metric(best_score if best_score != -np.inf else score_value),
-                val_mcc=_format_metric(val_metrics.get("mcc")),
                 patience=f"{patience}/{int(config.get('early_stopping_patience', 10))}",
+            )
+        elif hasattr(epoch_iter, "set_postfix"):
+            epoch_iter.set_postfix(
+                loss=f"{train_loss:.3f}",
+                best=_format_metric(best_score if best_score != -np.inf else score_value),
+                pat=f"{patience}/{int(config.get('early_stopping_patience', 10))}",
             )
         if epoch == 1 or epoch % log_every == 0:
             logger.info(

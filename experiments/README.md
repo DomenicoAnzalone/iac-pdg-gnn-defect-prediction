@@ -102,7 +102,7 @@ Le metriche sono AUC-PR, AUC-ROC, MCC, precision, recall, F1, accuracy e contegg
 
 Le pipeline stampano log leggibili in console e salvano sempre una copia completa in `experiments/results/<run_name>/logs/run.log`. Le progress bar aggiornano la stessa riga quando il terminale lo supporta. Usa `--no-progress` per disattivarle, `--quiet` per scrivere solo su file e `--log-every-epochs N` per ridurre i log per epoca nelle GNN.
 
-Per le run GNN lunghe, usa `--compact-progress`: la console mostra solo i log essenziali, una progress bar globale sugli split e una progress bar per le epoche dello split corrente. I dettagli completi restano nel file `logs/run.log`.
+Per le run GNN lunghe, usa `--compact-progress`: la console mostra solo i log essenziali e una singola riga di avanzamento che riporta split globale, epoca corrente, metriche sintetiche ed ETA. I dettagli completi restano nel file `logs/run.log`. La riga compatta si adatta alla larghezza corrente della console per ridurre i problemi quando si ridimensiona PowerShell.
 
 E1 rapido:
 

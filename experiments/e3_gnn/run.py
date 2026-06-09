@@ -7,7 +7,7 @@ import pandas as pd
 
 from experiments.common.balancing import balance_sequence
 from experiments.common.config import add_common_args, apply_common_overrides, load_config, parse_list
-from experiments.common.progress import get_logger, progress
+from experiments.common.progress import CompactStatusLine, get_logger, progress
 from experiments.common.reporting import save_experiment_outputs, write_summary
 from experiments.common.reproducibility import set_global_seed
 from experiments.common.runner import prepare_common_run
@@ -81,17 +81,24 @@ def main() -> None:
         model_metrics = []
         model_start = time.time()
         split_times = []
-        split_iter = progress(
-            list(enumerate(splits, start=1)),
-            total=len(splits),
-            desc="Split",
-            unit="split",
-            enabled=bool(config.get("progress", True)) and bool(config.get("compact_progress", False)),
-            leave=True,
-            position=0,
-        )
+        compact = bool(config.get("compact_progress", False))
+        compact_status = CompactStatusLine(len(splits), max_width=100, enabled=compact and bool(config.get("progress", True)))
+        if compact:
+            split_iter = list(enumerate(splits, start=1))
+        else:
+            split_iter = progress(
+                list(enumerate(splits, start=1)),
+                total=len(splits),
+                desc="Split",
+                unit="split",
+                enabled=bool(config.get("progress", True)),
+                leave=True,
+                position=0,
+            )
         for split_index, split in split_iter:
             split_start = time.time()
+            if compact:
+                compact_status.update(split_index=split_index, completed_splits=split_index - 1, status="loading")
             train_df, val_df, test_df = materialize_split(df, split)
             logger.info(
                 "E3/%s split %s/%s split_id=%s repo=%s: righe train=%s val=%s test=%s",
@@ -120,7 +127,9 @@ def main() -> None:
                     sorted({int(data.y.item()) for data in train_data}) if train_data else [],
                 )
                 if hasattr(split_iter, "set_postfix"):
-                    split_iter.set_postfix(repo=_short_repo(split.repository), status="skipped")
+                    split_iter.set_postfix(status="skip")
+                if compact:
+                    compact_status.update(split_index=split_index, completed_splits=split_index, status="skipped")
                 continue
             logger.info(
                 "E3/%s split=%s grafi caricati: train=%s val=%s test=%s esclusioni=%s",
@@ -158,6 +167,9 @@ def main() -> None:
                 repository=split.repository,
                 config=config,
                 model_dir=run_dir / "models",
+                compact_status=compact_status,
+                split_index=split_index,
+                total_splits=len(splits),
             )
             metrics["balance_before"] = str(balance_report["before"])
             metrics["balance_after"] = str(balance_report["after"])
@@ -167,11 +179,18 @@ def main() -> None:
             split_times.append(split_seconds)
             if hasattr(split_iter, "set_postfix"):
                 split_iter.set_postfix(
-                    repo=_short_repo(split.repository),
                     mcc=_format_metric(metrics.get("mcc")),
-                    auc_pr=_format_metric(metrics.get("auc_pr")),
                     avg=f"{sum(split_times) / len(split_times):.1f}s",
                 )
+            if compact:
+                compact_status.update(
+                    split_index=split_index,
+                    completed_splits=split_index,
+                    mcc=_format_metric(metrics.get("mcc")),
+                    avg=f"{sum(split_times) / len(split_times):.1f}s",
+                    eta=_eta(sum(split_times) / len(split_times), len(splits) - split_index),
+                )
+        compact_status.close()
         predictions_df = pd.concat(model_predictions, ignore_index=True) if model_predictions else pd.DataFrame()
         save_experiment_outputs(run_dir, "e3", canonical, predictions_df, model_metrics, None)
         logger.info("E3/%s output salvati: predizioni=%s split_metriche=%s", canonical, len(predictions_df), len(model_metrics))
@@ -191,10 +210,6 @@ def main() -> None:
     logger.info("E3 completato. Report: %s", run_dir / "reports" / "run_summary.md", extra={"console": True})
 
 
-def _short_repo(repository: str, max_len: int = 28) -> str:
-    return repository if len(repository) <= max_len else "..." + repository[-(max_len - 3):]
-
-
 def _format_metric(value: object) -> str:
     try:
         val = float(value)
@@ -203,6 +218,17 @@ def _format_metric(value: object) -> str:
         return f"{val:.3f}"
     except Exception:
         return "nan"
+
+
+def _eta(avg_seconds: float, remaining: int) -> str:
+    total = max(0, int(avg_seconds * remaining))
+    hours, rem = divmod(total, 3600)
+    minutes, seconds = divmod(rem, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    if minutes:
+        return f"{minutes}m{seconds:02d}s"
+    return f"{seconds}s"
 
 
 if __name__ == "__main__":
