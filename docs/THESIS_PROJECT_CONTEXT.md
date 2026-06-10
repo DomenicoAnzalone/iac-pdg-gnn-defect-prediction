@@ -47,7 +47,7 @@ La domanda generale del lavoro può essere formulata nel modo seguente:
 Questa domanda estende la linea di ricerca già presente nei documenti di riferimento:
 
 - il lavoro RADON studia la defect prediction di script IaC mediante metriche product e process;
-- il lavoro sulle metriche PDG valuta il valore predittivo di 11 metriche estratte dai Program Dependence Graph e utilizza RFECV per individuare le feature piu rilevanti;
+- il lavoro sulle metriche PDG valuta il valore predittivo di 11 metriche estratte dai Program Dependence Graph e utilizza RFECV per individuare le feature più rilevanti;
 - questa tesi aggiunge una terza prospettiva, in cui il grafo non è ridotto soltanto a metriche aggregate, ma viene utilizzato direttamente come input di una GNN per classificazione graph-level.
 
 Una possibile articolazione delle domande di ricerca finali è:
@@ -95,7 +95,7 @@ Le 11 metriche PDG considerate sono:
 | `directFanOut` | Dipendenze dirette in uscita |
 | `indirectFanOut` | Dipendenze indirette in uscita |
 
-Il lavoro precedente mostra che le metriche PDG possono essere utilizzate sia isolatamente sia insieme alle metriche già presenti nel dataset RADON. La RQ1 della tesi di Iuliano evidenzia anche che le 11 metriche non hanno lo stesso peso predittivo: RFECV seleziona in mediana quattro feature ottimali e indica come predittori piu ricorrenti `maxPdgVertices`, `verticesCount`, `edgesToVerticesRatio` ed `edgesCount`. Nel progetto corrente questa osservazione motiva l'uso della feature selection, ma non impone a priori lo stesso sottoinsieme: E2 usa tutte le 11 metriche PDG come candidate e applica RFECV soltanto sul training set di ogni split.
+Il lavoro precedente mostra che le metriche PDG possono essere utilizzate sia isolatamente sia insieme alle metriche già presenti nel dataset RADON. La RQ1 della tesi di Iuliano evidenzia anche che le 11 metriche non hanno lo stesso peso predittivo: RFECV seleziona in mediana quattro feature ottimali e indica come predittori più ricorrenti `maxPdgVertices`, `verticesCount`, `edgesToVerticesRatio` ed `edgesCount`. Nel progetto corrente questa osservazione motiva l'uso della feature selection, ma non impone a priori lo stesso sottoinsieme: E2 usa tutte le 11 metriche PDG come candidate e applica RFECV soltanto sul training set di ogni split.
 
 ### 3.3 Estensione proposta: classificazione graph-level con GNN
 
@@ -373,6 +373,17 @@ minima vengono esclusi? La risposta dovrà essere valutata sugli stessi split,
 con lo stesso preprocessing e con lo stesso protocollo usato per E1, E2 ed E3,
 in modo da non confondere l'effetto della soglia con differenze di validazione.
 
+Per verificare empiricamente questo punto, l'esperimento E3 con GraphSAGE è
+stato ripetuto quattro volte mantenendo invariati modello, seed, split,
+preprocessing e strategia di bilanciamento, e modificando soltanto la soglia
+minima di validità del grafo. Le configurazioni confrontate sono state:
+`3/2`, `5/4`, `8/6` e `10/6`, dove il primo valore indica il numero minimo di
+nodi e il secondo il numero minimo di archi. Le metriche pooled non mostrano un
+miglioramento stabile con soglie più restrittive; al contrario, la soglia base
+`3/2` resta la migliore su MCC, AUC-PR e AUC-ROC pooled. Per il benchmark
+principale si mantiene quindi `min_nodes=3` e `min_edges=2`, usando eventuali
+soglie più restrittive solo come analisi di sensibilità secondaria.
+
 Il report della versione è:
 
 ```text
@@ -494,7 +505,7 @@ Il protocollo principale deve essere una validazione **within-project walk-forwa
 
 Questo schema preserva l'ordine temporale ed evita di addestrare un modello usando informazioni provenienti dal futuro rispetto al test set.
 
-La logica walk-forward e ora centralizzata in `experiments/common/splitting.py` ed e riusata da E1, E2 ed E3.
+La logica walk-forward è ora centralizzata in `experiments/common/splitting.py` ed è riusata da E1, E2 ed E3.
 
 ### 7.3 Validation set
 
@@ -535,7 +546,7 @@ Il bilanciamento deve essere applicato:
 - con seed riproducibile;
 - senza modificare validation e test.
 
-La logica di bilanciamento e ora centralizzata in `experiments/common/balancing.py` e supporta `none`, `random_undersampling` e `random_oversampling`. La strategia viene applicata solo al training set per tutti gli esperimenti. Eventuali tecniche sintetiche, come SMOTE, richiedono una valutazione separata perché non sono direttamente equivalenti per dati tabellari e grafi.
+La logica di bilanciamento è ora centralizzata in `experiments/common/balancing.py` e supporta `none`, `random_undersampling` e `random_oversampling`. La strategia viene applicata solo al training set per tutti gli esperimenti. Eventuali tecniche sintetiche, come SMOTE, richiedono una valutazione separata perché non sono direttamente equivalenti per dati tabellari e grafi.
 
 ### 7.6 Selezione dei modelli e iperparametri
 
@@ -617,16 +628,16 @@ Ogni run deve salvare:
 - La pipeline RADON è strutturata e riproducibile.
 - Le run RADON salvano report, metadati e stati delle repository.
 - Sono presenti dataset reali ed esempi di estrazione PDG.
-- La pipeline sperimentale finale e sotto `experiments/` e usa moduli condivisi per data loading, split, preprocessing, balancing, evaluation, reporting e riproducibilita.
+- La pipeline sperimentale finale è sotto `experiments/` e usa moduli condivisi per data loading, split, preprocessing, balancing, evaluation, reporting e riproducibilità.
 - E1, E2 ed E3 salvano config, metadata, split manifest, predizioni, metriche e report in un formato confrontabile.
 
 ### 8.2 Lacune principali
 
 - La configurazione sperimentale finale deve ancora essere congelata dopo la fase esplorativa.
-- La prima run completa E3 GraphSAGE e stata eseguita e ha evidenziato criticita da documentare: split piccoli, MCC non definito in alcuni casi, variabilita tra repository e tendenza a predire piu positivi del reale.
+- La prima run completa E3 GraphSAGE è stata eseguita e ha evidenziato criticità da documentare: split piccoli, MCC non definito in alcuni casi, variabilità tra repository e tendenza a predire più positivi del reale.
 - Le metriche aggregate sono state arricchite con metriche pooled calcolate sulle predizioni aggregate; restano da consolidare metriche pesate per numero di test sample e bucket per dimensione del test set.
 - E1 ed E2 devono ancora essere eseguiti sulle stesse configurazioni esplorative della GNN.
-- Il confronto statistico e presente come base, ma Friedman/Nemenyi e ulteriori effect size restano da consolidare.
+- Il confronto statistico è presente come base, ma Friedman/Nemenyi e ulteriori effect size restano da consolidare.
 
 ---
 
@@ -698,8 +709,8 @@ Attività:
 - validare il parsing dei grafi e le feature;
 - gestire correttamente grafi vuoti o non validi;
 - verificare l'uso delle relazioni degli archi;
-- aggiungere una small-graph sensitivity analysis con soglie configurabili, ad
-  esempio `3/2`, `4/3`, `5/4`, `6/5`, `8/7` e `10/9`;
+- aggiungere una small-graph sensitivity analysis con soglie configurabili. La
+  prima analisi è stata eseguita su GraphSAGE con `3/2`, `5/4`, `8/6` e `10/6`;
 - salvare per ogni soglia conteggi rimossi, distribuzione delle classi,
   repository rappresentate, risultati per split e differenza rispetto al dataset
   principale;

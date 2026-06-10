@@ -166,6 +166,14 @@ python -m experiments.sensitivity.small_graph_analysis --dataset datasets/ansibl
 
 La sensitivity sul training si esegue ripetendo E1/E2/E3 con valori diversi di `--min-nodes` e `--min-edges`. Ogni run salva config, esclusioni e performance, quindi l'effetto delle soglie può essere confrontato con `compare_results.py`.
 
+Per E3 si può lanciare una sweep sequenziale con un solo comando:
+
+```bash
+python -m experiments.sensitivity.run_threshold_sweep --config experiments/configs/e3_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --thresholds 3:2,5:4,8:6,10:6 --run-prefix e3_graphsage_threshold --model graphsage --balance random_oversampling --epochs 100 --batch-size 32 --seed 42 --log-every-epochs 5
+```
+
+La sweep crea una run separata per ogni soglia e un riepilogo in `experiments/results/small_graph_threshold_sweep/threshold_run_summary.csv`.
+
 ## Limiti Noti
 
 - E2 usa tutte le 11 metriche PDG come candidate e RFECV come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.
