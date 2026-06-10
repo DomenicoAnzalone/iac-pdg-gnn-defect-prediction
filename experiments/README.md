@@ -174,6 +174,24 @@ python -m experiments.sensitivity.run_threshold_sweep --config experiments/confi
 
 La sweep crea una run separata per ogni soglia e un riepilogo in `experiments/results/small_graph_threshold_sweep/threshold_run_summary.csv`.
 
+## Split Reliability
+
+Dopo aver scelto la soglia sui grafi, si può analizzare quanto gli split con test set molto piccoli influenzano le metriche finali. Questa analisi non riaddestra i modelli: legge le predizioni salvate, filtra gli split in base a `test_size` e numero di positivi nel test, poi ricalcola le metriche pooled.
+
+```bash
+python -m experiments.sensitivity.split_reliability_analysis --results-dir experiments/results/e3_graphsage_threshold_n3_e2 --min-test-sizes 2,5,10,20,30,50 --min-test-positives 1,2,3,5 --min-test-negatives 1
+```
+
+Output principali:
+
+```text
+experiments/results/e3_graphsage_threshold_n3_e2/reports/split_reliability/split_reliability_summary.csv
+experiments/results/e3_graphsage_threshold_n3_e2/reports/split_reliability/split_reliability_summary.md
+experiments/results/e3_graphsage_threshold_n3_e2/reports/split_reliability/split_test_size_distribution.csv
+```
+
+La decisione finale deve bilanciare stabilità delle metriche e copertura: una soglia che migliora leggermente MCC ma elimina troppi campioni di test non è necessariamente migliore.
+
 ## Limiti Noti
 
 - E2 usa tutte le 11 metriche PDG come candidate e RFECV come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.

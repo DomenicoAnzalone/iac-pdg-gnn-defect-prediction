@@ -516,6 +516,13 @@ Il validation set deve essere estratto dal training set in modo temporale, quand
 - registrato nei metadati dello split;
 - valutato come possibile minaccia alla validità.
 
+Gli split con una sola classe in training o test vengono esclusi prima del
+training, perché non permettono una valutazione robusta di metriche come MCC e
+AUC. Gli split con test set piccolo ma contenente entrambe le classi vengono
+invece mantenuti nel benchmark principale: sono temporalmente validi e, usando
+metriche pooled, non pesano quanto split più grandi. La loro influenza viene
+valutata con un'analisi post-hoc di affidabilità degli split.
+
 ### 7.4 Preprocessing
 
 Il preprocessing deve essere definito per famiglia di input, mantenendo la stessa informazione temporale.
@@ -587,6 +594,13 @@ Tutti gli esperimenti devono produrre almeno:
 `MCC` e `AUC-PR` devono ricevere particolare attenzione nell'interpretazione finale.
 
 Per il confronto finale, precision, recall, F1, MCC, AUC-PR e AUC-ROC devono essere riportate principalmente in forma pooled: prima si aggregano tutte le predizioni dei test set walk-forward e poi si calcolano le metriche sul totale. Le medie semplici per split restano utili come diagnostica, ma non devono essere l'unico risultato principale, perché split con pochissimi campioni o poche istanze positive possono introdurre molto rumore.
+
+La prima analisi di affidabilità sugli split E3 GraphSAGE ha confermato che
+filtrare rigidamente gli split piccoli migliora poco o in modo non stabile le
+metriche principali, eliminando però una quota rilevante delle predizioni test.
+Per il benchmark principale si mantengono quindi tutti gli split validi; come
+diagnostica secondaria si può riportare il filtro `min_test_size=10`,
+`min_test_positives=2`, `min_test_negatives=1`.
 
 ### 7.8 Artefatti da salvare
 
