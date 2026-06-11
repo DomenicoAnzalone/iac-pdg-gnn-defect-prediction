@@ -192,6 +192,76 @@ experiments/results/e3_graphsage_threshold_n3_e2/reports/split_reliability/split
 
 La decisione finale deve bilanciare stabilità delle metriche e copertura: una soglia che migliora leggermente MCC ma elimina troppi campioni di test non è necessariamente migliore.
 
+## Balance Strategy Sweep
+
+Dopo aver fissato soglia dei grafi e gestione degli split, si può confrontare la strategia di bilanciamento del training set. Lo sweep lancia E3 GraphSAGE più volte con la stessa configurazione e cambia solo:
+
+```text
+none, random_oversampling, random_undersampling
+```
+
+Comando completo:
+
+```bash
+python -m experiments.sensitivity.run_balance_sweep --config experiments/configs/e3_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --strategies none,random_oversampling,random_undersampling --run-prefix e3_graphsage_balance --model graphsage --min-nodes 3 --min-edges 2 --epochs 100 --batch-size 32 --seed 42 --log-every-epochs 5 --compact-progress
+```
+
+Output principali:
+
+```text
+experiments/results/e3_balance_sweep/balance_run_summary.csv
+experiments/results/e3_balance_sweep/balance_run_summary.md
+```
+
+Ogni singola run viene salvata in:
+
+```text
+experiments/results/e3_graphsage_balance_none/
+experiments/results/e3_graphsage_balance_random_oversampling/
+experiments/results/e3_graphsage_balance_random_undersampling/
+```
+
+Se una run esiste già e vuoi ricostruire solo il riepilogo senza riaddestrare, aggiungi:
+
+```bash
+--skip-existing
+```
+
+Il confronto va letto soprattutto da `mcc`, `auc_pr`, `precision`, `recall`, `f1` e `predicted_positive_rate`. MCC resta la metrica guida; AUC-PR è importante perché il dataset è sbilanciato; precision/recall servono a capire se una strategia sta semplicemente predicendo troppi positivi.
+
+## Seed Stability Sweep
+
+Dopo aver fissato soglia dei grafi, gestione degli split e bilanciamento, si può verificare se la configurazione E3 è stabile rispetto al seed. Lo sweep lancia GraphSAGE più volte cambiando solo il seed.
+
+Comando completo:
+
+```bash
+python -m experiments.sensitivity.run_seed_sweep --config experiments/configs/e3_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --seeds 42,7,123 --run-prefix e3_graphsage_seed --model graphsage --min-nodes 3 --min-edges 2 --balance random_oversampling --epochs 100 --batch-size 32 --log-every-epochs 5 --compact-progress
+```
+
+Output principali:
+
+```text
+experiments/results/e3_seed_sweep/seed_run_summary.csv
+experiments/results/e3_seed_sweep/seed_run_summary.md
+```
+
+Ogni singola run viene salvata in:
+
+```text
+experiments/results/e3_graphsage_seed_42/
+experiments/results/e3_graphsage_seed_7/
+experiments/results/e3_graphsage_seed_123/
+```
+
+Se una run esiste già e vuoi ricostruire solo il riepilogo senza riaddestrare, aggiungi:
+
+```bash
+--skip-existing
+```
+
+La configurazione è considerata stabile se MCC, AUC-PR e F1 cambiano poco tra seed e se il positive rate predetto resta coerente.
+
 ## Limiti Noti
 
 - E2 usa tutte le 11 metriche PDG come candidate e RFECV come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.

@@ -555,6 +555,16 @@ Il bilanciamento deve essere applicato:
 
 La logica di bilanciamento è ora centralizzata in `experiments/common/balancing.py` e supporta `none`, `random_undersampling` e `random_oversampling`. La strategia viene applicata solo al training set per tutti gli esperimenti. Eventuali tecniche sintetiche, come SMOTE, richiedono una valutazione separata perché non sono direttamente equivalenti per dati tabellari e grafi.
 
+Una prima analisi controllata su E3 GraphSAGE ha confrontato le tre strategie disponibili mantenendo invariati dataset, soglia grafi `3/2`, split, seed, modello e iperparametri. I risultati pooled sono:
+
+| Strategia | MCC | AUC-PR | AUC-ROC | Precision | Recall | F1 | Accuracy | Positive rate predetto |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `none` | 0,487 | 0,588 | 0,791 | 0,611 | 0,783 | 0,687 | 0,745 | 0,458 |
+| `random_oversampling` | 0,563 | 0,643 | 0,818 | 0,646 | 0,842 | 0,731 | 0,779 | 0,465 |
+| `random_undersampling` | 0,430 | 0,543 | 0,743 | 0,573 | 0,763 | 0,655 | 0,713 | 0,476 |
+
+Tutte le run usano 1.706 split validi e 25.062 predizioni test, con positive rate reale pari a circa 0,357. `random_oversampling` migliora tutte le metriche principali rispetto a `none` e `random_undersampling`, riducendo anche i falsi negativi senza aumentare i falsi positivi rispetto a `none`. Per il benchmark principale viene quindi adottato `random_oversampling` come strategia di bilanciamento comune, sempre applicata solo al training set. `none` resta una baseline diagnostica secondaria; `random_undersampling` non è consigliata perché perde informazione utile e peggiora tutte le metriche pooled.
+
 ### 7.6 Selezione dei modelli e iperparametri
 
 I classificatori classici dovrebbero includere almeno modelli coerenti con i lavori precedenti, ad esempio:
@@ -647,10 +657,10 @@ Ogni run deve salvare:
 
 ### 8.2 Lacune principali
 
-- La configurazione sperimentale finale deve ancora essere congelata dopo la fase esplorativa.
+- La configurazione sperimentale finale è stata parzialmente congelata dopo la fase esplorativa: soglia grafi `3/2`, mantenimento degli split validi e bilanciamento `random_oversampling`.
 - La prima run completa E3 GraphSAGE è stata eseguita e ha evidenziato criticità da documentare: split piccoli, MCC non definito in alcuni casi, variabilità tra repository e tendenza a predire più positivi del reale.
 - Le metriche aggregate sono state arricchite con metriche pooled calcolate sulle predizioni aggregate; restano da consolidare metriche pesate per numero di test sample e bucket per dimensione del test set.
-- E1 ed E2 devono ancora essere eseguiti sulle stesse configurazioni esplorative della GNN.
+- E1 ed E2 devono ancora essere eseguiti con la configurazione comune fissata dalla fase esplorativa.
 - Il confronto statistico è presente come base, ma Friedman/Nemenyi e ulteriori effect size restano da consolidare.
 
 ---
