@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from experiments.common.classical import run_tabular_experiment
+from experiments.common.classical import MODEL_ALIASES, run_tabular_experiment
 from experiments.common.config import add_common_args, apply_common_overrides, load_config, parse_list
 from experiments.common.feature_sets import e1_features
 from experiments.common.progress import get_logger
@@ -43,10 +43,11 @@ def main() -> None:
         config=config,
     )
     for model in models:
-        model_predictions = predictions[predictions["model"].eq(model)] if not predictions.empty else predictions
-        model_metrics = [row for row in metrics_rows if row["model"] == model]
-        model_features = feature_manifest[feature_manifest["model"].eq(model)] if not feature_manifest.empty else feature_manifest
-        save_experiment_outputs(run_dir, "e1", model, model_predictions, model_metrics, model_features)
+        canonical = MODEL_ALIASES.get(model.lower(), model.lower())
+        model_predictions = predictions[predictions["model"].eq(canonical)] if not predictions.empty else predictions
+        model_metrics = [row for row in metrics_rows if row["model"] == canonical]
+        model_features = feature_manifest[feature_manifest["model"].eq(canonical)] if not feature_manifest.empty else feature_manifest
+        save_experiment_outputs(run_dir, "e1", canonical, model_predictions, model_metrics, model_features)
     write_summary(run_dir, "E1 Tabular Baseline", config)
     logger.info("E1 completato. Report: %s", run_dir / "reports" / "run_summary.md")
 

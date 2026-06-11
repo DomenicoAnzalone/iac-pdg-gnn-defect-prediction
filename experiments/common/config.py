@@ -86,6 +86,7 @@ def parse_list(value: Optional[str | Iterable[str]], default: Optional[List[str]
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config")
     parser.add_argument("--dataset")
+    parser.add_argument("--results-root")
     parser.add_argument("--run-name", default="smoke_run")
     parser.add_argument("--balance", choices=["none", "random_undersampling", "random_oversampling"])
     parser.add_argument("--scaler", choices=["none", "min-max", "standard"])
@@ -105,6 +106,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
 def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
     mapping = {
         "dataset": "dataset",
+        "results_root": "results_root",
         "balance_strategy": "balance",
         "scaler": "scaler",
         "seed": "seed",

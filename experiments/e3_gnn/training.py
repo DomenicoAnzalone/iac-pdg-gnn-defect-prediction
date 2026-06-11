@@ -91,11 +91,20 @@ def run_gnn_model(
     )
     for epoch in epoch_iter:
         train_loss = _train_epoch(model, train_loader, optimizer, criterion, device)
-        val_pred = _predict(model, val_loader, device)
+        val_loss, val_pred = _evaluate(model, val_loader, criterion, device)
         val_metrics = compute_binary_metrics(val_pred["y_true"], val_pred["y_pred"], val_pred["y_score"])
         score = val_metrics.get(config.get("early_stopping_metric", "mcc"), np.nan)
-        score_value = float(score) if score == score else -np.inf
-        history.append({"epoch": epoch, "train_loss": train_loss, **{f"val_{k}": v for k, v in val_metrics.items() if isinstance(v, (int, float))}})
+        metric_score = float(score) if score == score else np.nan
+        used_loss_fallback = metric_score != metric_score
+        score_value = -val_loss if used_loss_fallback else metric_score
+        history.append({
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "early_stopping_score": score_value,
+            "early_stopping_used_loss_fallback": used_loss_fallback,
+            **{f"val_{k}": v for k, v in val_metrics.items() if isinstance(v, (int, float))},
+        })
         if score_value > best_score:
             best_score = score_value
             patience = 0
@@ -120,13 +129,15 @@ def run_gnn_model(
             )
         if epoch == 1 or epoch % log_every == 0:
             logger.info(
-                "E3/%s split=%s epoch=%s loss=%.4f val_mcc=%s val_auc_pr=%s patience=%s",
+                "E3/%s split=%s epoch=%s loss=%.4f val_loss=%.4f val_mcc=%s val_auc_pr=%s early_stop=%s patience=%s",
                 canonical,
                 split_id,
                 epoch,
                 train_loss,
+                val_loss,
                 _format_metric(val_metrics.get("mcc")),
                 _format_metric(val_metrics.get("auc_pr")),
+                "val_loss" if used_loss_fallback else config.get("early_stopping_metric", "mcc"),
                 patience,
             )
         if patience >= int(config.get("early_stopping_patience", 10)):
@@ -136,7 +147,7 @@ def run_gnn_model(
     if best_path.exists():
         model.load_state_dict(torch.load(best_path, map_location=device))
     test_loader = DataLoader(test_data, batch_size=int(config.get("batch_size", 32)), shuffle=False)
-    test_pred = _predict(model, test_loader, device)
+    _, test_pred = _evaluate(model, test_loader, criterion, device)
     metrics = compute_binary_metrics(test_pred["y_true"], test_pred["y_pred"], test_pred["y_score"])
     metrics.update({
         "experiment": "e3",
@@ -148,7 +159,9 @@ def run_gnn_model(
         "test_size": len(test_data),
         "training_seconds": training_seconds,
         "epochs_ran": len(history),
-        "best_validation_score": best_score if best_score != -np.inf else np.nan,
+        "best_early_stopping_score": best_score if best_score != -np.inf else np.nan,
+        "early_stopping_used_loss_fallback": any(bool(row.get("early_stopping_used_loss_fallback")) for row in history),
+        "best_validation_score": _best_defined_validation_metric(history, config.get("early_stopping_metric", "mcc")),
     })
     logger.info(
         "E3/%s split=%s test completato: mcc=%s auc_pr=%s f1=%s tempo=%.2fs",
@@ -192,21 +205,37 @@ def _train_epoch(model, loader, optimizer, criterion, device) -> float:
     return total / max(graphs, 1)
 
 
-def _predict(model, loader, device) -> Dict[str, List[Any]]:
+def _evaluate(model, loader, criterion, device) -> Tuple[float, Dict[str, List[Any]]]:
     model.eval()
     y_true: List[int] = []
     y_pred: List[int] = []
     y_score: List[float] = []
+    total_loss = 0.0
+    graphs = 0
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
             logits = model(batch)
+            y = batch.y.view(-1).long()
+            loss = criterion(logits, y)
             scores = torch.softmax(logits, dim=1)[:, 1]
             pred = (scores >= 0.5).long()
-            y_true.extend(batch.y.view(-1).cpu().numpy().astype(int).tolist())
+            total_loss += float(loss.item()) * int(batch.num_graphs)
+            graphs += int(batch.num_graphs)
+            y_true.extend(y.cpu().numpy().astype(int).tolist())
             y_pred.extend(pred.cpu().numpy().astype(int).tolist())
             y_score.extend(scores.cpu().numpy().astype(float).tolist())
-    return {"y_true": y_true, "y_pred": y_pred, "y_score": y_score}
+    return total_loss / max(graphs, 1), {"y_true": y_true, "y_pred": y_pred, "y_score": y_score}
+
+
+def _best_defined_validation_metric(history: List[Dict[str, Any]], metric_name: str) -> float:
+    values = []
+    key = f"val_{metric_name}"
+    for row in history:
+        value = row.get(key)
+        if isinstance(value, (int, float)) and value == value:
+            values.append(float(value))
+    return max(values) if values else np.nan
 
 
 def _criterion(train_data: List[object], config: Dict[str, Any], device) -> object:

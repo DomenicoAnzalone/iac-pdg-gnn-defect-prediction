@@ -444,6 +444,10 @@ La differenza tra E1 ed E2 deve essere limitata al feature set. Split, campioni,
 
 Questo esperimento risponde direttamente alla domanda: le metriche PDG aggregate aggiungono informazione predittiva rispetto alle metriche già disponibili?
 
+Una prima run comune con Random Forest ha confrontato E1 ed E2 sugli stessi 1.706 split e 25.062 predizioni test. E2, usando tutte le 11 metriche PDG candidate e RFECV train-only, migliora E1 sulle metriche di classificazione pooled: MCC `0,606` contro `0,580`, F1 `0,756` contro `0,742`, accuracy `0,797` contro `0,784`, precision `0,663` contro `0,649` e recall `0,881` contro `0,866`. Riduce inoltre sia i falsi positivi (`4.012` contro `4.199`) sia i falsi negativi (`1.068` contro `1.203`). Il risultato non è uniforme sulle metriche di ranking: AUC-PR scende da `0,794` a `0,782` e AUC-ROC da `0,886` a `0,883`. L'interpretazione prudente è che le metriche PDG aggregate aggiungono informazione utile per la decisione finale del classificatore, ma non migliorano necessariamente il ranking probabilistico. Il benchmark finale dovrà quindi riportare entrambe le famiglie di metriche.
+
+L'analisi del feature manifest E2 conferma che RFECV non seleziona tutte le metriche PDG con la stessa frequenza: `edgesToVerticesRatio`, `verticesCount`, `edgesCount` e `maxPdgVertices` sono tra le più ricorrenti, mentre `lackOfCohesion` è quasi sempre scartata. Questa evidenza supporta l'uso di tutte le 11 metriche come candidate, lasciando la selezione al training set di ogni split.
+
 ### 6.3 Esperimento 3: GNN sui PDG file-level
 
 Il terzo esperimento usa i grafi associati alle stesse righe dei primi due esperimenti.
@@ -565,6 +569,8 @@ Una prima analisi controllata su E3 GraphSAGE ha confrontato le tre strategie di
 
 Tutte le run usano 1.706 split validi e 25.062 predizioni test, con positive rate reale pari a circa 0,357. `random_oversampling` migliora tutte le metriche principali rispetto a `none` e `random_undersampling`, riducendo anche i falsi negativi senza aumentare i falsi positivi rispetto a `none`. Per il benchmark principale viene quindi adottato `random_oversampling` come strategia di bilanciamento comune, sempre applicata solo al training set. `none` resta una baseline diagnostica secondaria; `random_undersampling` non è consigliata perché perde informazione utile e peggiora tutte le metriche pooled.
 
+La configurazione E3 GraphSAGE selezionata è stata poi ripetuta con tre seed (`42`, `7`, `123`) per verificare la stabilità. Le metriche pooled sono risultate molto coerenti: MCC medio `0,567` con range `0,009`, F1 medio `0,734` con range `0,005`, AUC-ROC medio `0,818` con range `0,004` e positive rate predetto compreso tra `0,464` e `0,472`. AUC-PR è la metrica più variabile, ma resta in un intervallo contenuto (`0,625`-`0,643`). Questo supporta l'uso di GraphSAGE con soglia `3/2` e `random_oversampling` come baseline GNN principale, riportando media e deviazione standard sui seed come analisi di robustezza.
+
 ### 7.6 Selezione dei modelli e iperparametri
 
 I classificatori classici dovrebbero includere almeno modelli coerenti con i lavori precedenti, ad esempio:
@@ -643,7 +649,7 @@ Ogni run deve salvare:
 | Metriche PDG | Implementate per la prima versione finale | `dataset_preparation/scripts/build_versioned_dataset.py`, `ansible-pdg-defect-dataset_v2026-06-06_pdg_metrics.csv` | Le metriche sono calcolate sul GraphML file-level; alcune semantiche sono proxy documentate con `pdg_metric_semantics=file_level_proxy_v1` |
 | Caricamento e preprocessing grafi | Implementato nella pipeline finale | `experiments/e3_gnn/graph_loader.py`, `experiments/e3_gnn/graph_data.py`, `experiments/e3_gnn/feature_engineering.py` | Include GraphML/DOT, feature nodali deterministiche ed edge type |
 | Split walk-forward e bilanciamento | Centralizzati | `experiments/common/splitting.py`, `experiments/common/balancing.py` | Riutilizzati da E1, E2 ed E3 |
-| Training GNN | Implementato e configurabile | `experiments/e3_gnn/run.py`, `experiments/e3_gnn/training.py`, `experiments/e3_gnn/models.py` | Supporta GCN, GraphSAGE, GAT, GIN e R-GCN, early stopping e checkpoint |
+| Training GNN | Implementato e configurabile | `experiments/e3_gnn/run.py`, `experiments/e3_gnn/training.py`, `experiments/e3_gnn/models.py` | Supporta GCN, GraphSAGE, GAT, GIN e R-GCN, early stopping e checkpoint; se la metrica di validation non è definibile usa la validation loss come fallback per scegliere il checkpoint |
 | Classificatori classici finali | Implementati | `experiments/e1_tabular_baseline/run.py`, `experiments/e2_tabular_pdg/run.py`, `experiments/common/classical.py` | E2 usa le 11 metriche PDG candidate con RFECV train-only |
 | Confronto finale e analisi statistica | Prima utility implementata | `experiments/compare_results.py` | Produce confronto descrittivo e Wilcoxon paired quando possibile |
 
@@ -654,13 +660,15 @@ Ogni run deve salvare:
 - Sono presenti dataset reali ed esempi di estrazione PDG.
 - La pipeline sperimentale finale è sotto `experiments/` e usa moduli condivisi per data loading, split, preprocessing, balancing, evaluation, reporting e riproducibilità.
 - E1, E2 ed E3 salvano config, metadata, split manifest, predizioni, metriche e report in un formato confrontabile.
+- I risultati esplorativi sono raccolti in `experiments/results/exploratory/`; il benchmark finale è separato in `experiments/results/benchmark/`.
+- La pipeline completa del benchmark è gestita da `experiments/run_full_benchmark.py`, che esegue sequenzialmente E1, E2 ed E3 e supporta il riavvio saltando le run già complete.
 
 ### 8.2 Lacune principali
 
-- La configurazione sperimentale finale è stata parzialmente congelata dopo la fase esplorativa: soglia grafi `3/2`, mantenimento degli split validi e bilanciamento `random_oversampling`.
+- La configurazione E3 GraphSAGE principale è stata congelata dopo la fase esplorativa: soglia grafi `3/2`, mantenimento degli split validi, metriche pooled, bilanciamento `random_oversampling` e robustezza verificata su tre seed.
 - La prima run completa E3 GraphSAGE è stata eseguita e ha evidenziato criticità da documentare: split piccoli, MCC non definito in alcuni casi, variabilità tra repository e tendenza a predire più positivi del reale.
 - Le metriche aggregate sono state arricchite con metriche pooled calcolate sulle predizioni aggregate; restano da consolidare metriche pesate per numero di test sample e bucket per dimensione del test set.
-- E1 ed E2 devono ancora essere eseguiti con la configurazione comune fissata dalla fase esplorativa.
+- E1 ed E2 sono stati eseguiti nella prima configurazione comune Random Forest; la pipeline definitiva ora consente di estendere il benchmark agli altri classificatori classici e alle altre GNN in modo riavviabile.
 - Il confronto statistico è presente come base, ma Friedman/Nemenyi e ulteriori effect size restano da consolidare.
 
 ---

@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-from scipy.stats import wilcoxon
+
+try:
+    from scipy.stats import wilcoxon
+except Exception:  # pragma: no cover
+    wilcoxon = None
 
 
 def main() -> None:
@@ -16,18 +20,36 @@ def main() -> None:
     parser.add_argument("--metric", default="mcc")
     args = parser.parse_args()
     results_dir = Path(args.results_dir)
-    per_split_path = results_dir / "metrics" / "per_split_metrics.csv"
-    if not per_split_path.exists():
-        raise FileNotFoundError(f"Missing per-split metrics: {per_split_path}")
-    per_split = pd.read_csv(per_split_path)
-    pooled_path = results_dir / "metrics" / "pooled_metrics.csv"
-    pooled = pd.read_csv(pooled_path) if pooled_path.exists() else None
+    per_split, pooled, output_dir = load_results(results_dir)
     summary = build_comparison(per_split, args.metric, pooled)
-    out_csv = results_dir / "reports" / "comparison_summary.csv"
+    out_csv = output_dir / "comparison_summary.csv"
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(out_csv, index=False)
-    out_md = Path(args.output) if args.output else results_dir / "reports" / "comparison_summary.md"
+    out_md = Path(args.output) if args.output else output_dir / "comparison_summary.md"
+    out_md.parent.mkdir(parents=True, exist_ok=True)
     out_md.write_text(render_markdown(summary, args.metric), encoding="utf-8")
+
+
+def load_results(results_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame | None, Path]:
+    single_per_split = results_dir / "metrics" / "per_split_metrics.csv"
+    if single_per_split.exists():
+        pooled_path = results_dir / "metrics" / "pooled_metrics.csv"
+        pooled = pd.read_csv(pooled_path) if pooled_path.exists() else None
+        return pd.read_csv(single_per_split), pooled, results_dir / "reports"
+
+    per_split_frames = []
+    pooled_frames = []
+    for child in sorted(path for path in results_dir.iterdir() if path.is_dir() and not path.name.startswith("_")):
+        per_split_path = child / "metrics" / "per_split_metrics.csv"
+        pooled_path = child / "metrics" / "pooled_metrics.csv"
+        if per_split_path.exists():
+            per_split_frames.append(pd.read_csv(per_split_path))
+        if pooled_path.exists():
+            pooled_frames.append(pd.read_csv(pooled_path))
+    if not per_split_frames:
+        raise FileNotFoundError(f"Missing per-split metrics under: {results_dir}")
+    pooled = pd.concat(pooled_frames, ignore_index=True) if pooled_frames else None
+    return pd.concat(per_split_frames, ignore_index=True), pooled, results_dir / "_summary"
 
 
 def build_comparison(per_split: pd.DataFrame, metric: str, pooled: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -58,7 +80,7 @@ def build_comparison(per_split: pd.DataFrame, metric: str, pooled: pd.DataFrame 
         right = per_split[(per_split["experiment"] == right_exp) & (per_split["model"] == right_model)][["split_id", metric]].rename(columns={metric: "right_metric"})
         paired = left.merge(right, on="split_id").dropna()
         pvalue = ""
-        if len(paired) >= 2 and (paired["left_metric"] - paired["right_metric"]).abs().sum() > 0:
+        if wilcoxon is not None and len(paired) >= 2 and (paired["left_metric"] - paired["right_metric"]).abs().sum() > 0:
             try:
                 pvalue = float(wilcoxon(paired["left_metric"], paired["right_metric"]).pvalue)
             except Exception:
