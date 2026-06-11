@@ -13,7 +13,7 @@ from experiments.common.data_loading import load_dataset
 def main() -> None:
     parser = argparse.ArgumentParser(description="Describe small-graph sensitivity thresholds.")
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
-    parser.add_argument("--output-dir", default="experiments/results/small_graph_sensitivity")
+    parser.add_argument("--output-dir", default="experiments/results/exploratory/small_graph_sensitivity")
     parser.add_argument("--thresholds", default="3:2,5:4,8:6,10:6")
     args = parser.parse_args()
     df = load_dataset(args.dataset)
@@ -79,4 +79,3 @@ def render(summary: pd.DataFrame, bucket_summary: pd.DataFrame) -> str:
 
 if __name__ == "__main__":
     main()
-
