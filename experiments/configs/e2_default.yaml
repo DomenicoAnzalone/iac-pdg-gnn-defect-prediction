@@ -1,0 +1,13 @@
+{
+  "models": ["random_forest"],
+  "pdg_metrics": "all",
+  "balance_strategy": "random_oversampling",
+  "scaler": "standard",
+  "feature_selection": "rfecv",
+  "rfecv_cv": 3,
+  "rfecv_step": 0.1,
+  "rfecv_min_features_to_select": 1,
+  "min_nodes": 3,
+  "min_edges": 2,
+  "seed": 42
+}
