@@ -200,6 +200,8 @@ experiments/results/benchmark/final_benchmark_v1/_summary/benchmark_summary.md
 
 La pipeline è riavviabile: se viene interrotta, rilancia lo stesso comando. Le run che hanno già `metrics/pooled_metrics.csv` vengono saltate automaticamente. Se una run si interrompe a metà, quella specifica run viene rieseguita dall'inizio, ma le run già completate non vengono ripetute.
 
+Il benchmark usa di default la modalità `--compact-progress`: la console mostra solo log essenziali e avanzamento sintetico, mentre i dettagli per split ed epoca restano nei file `logs/run.log` delle singole run.
+
 Per forzare il ricalcolo anche delle run già complete:
 
 ```bash

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Dict, List, Tuple
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -11,6 +13,20 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import make_scorer, matthews_corrcoef
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+
+_SKLEARN_PARALLEL_WARNING = r".*sklearn\.utils\.parallel\.delayed.*"
+_PYTHONWARNINGS_FILTER = "ignore:.*sklearn.utils.parallel.delayed.*:UserWarning"
+
+warnings.filterwarnings(
+    "ignore",
+    message=_SKLEARN_PARALLEL_WARNING,
+    category=UserWarning,
+)
+if _PYTHONWARNINGS_FILTER not in os.environ.get("PYTHONWARNINGS", ""):
+    os.environ["PYTHONWARNINGS"] = ",".join(
+        item for item in [os.environ.get("PYTHONWARNINGS", ""), _PYTHONWARNINGS_FILTER] if item
+    )
 
 
 @dataclass

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -69,7 +70,7 @@ def main() -> None:
         command = _build_command(args, step, benchmark_root)
         print(" ".join(command), flush=True)
         started_at = datetime.now().isoformat(timespec="seconds")
-        completed = subprocess.run(command, cwd=Path.cwd())
+        completed = subprocess.run(command, cwd=Path.cwd(), env=_child_env())
         return_code = int(completed.returncode)
         status = "dry_run" if args.dry_run and return_code == 0 else "completed" if return_code == 0 else "failed"
         row = _run_row(step, status=status, return_code=return_code)
@@ -138,6 +139,8 @@ def _build_command(args: argparse.Namespace, step: Dict[str, object], benchmark_
         "--seed",
         str(args.seed),
     ]
+    if args.compact_progress:
+        command.append("--compact-progress")
     experiment = str(step["experiment"])
     if experiment in {"e1", "e2"}:
         command.extend([
@@ -165,8 +168,6 @@ def _build_command(args: argparse.Namespace, step: Dict[str, object], benchmark_
             "--log-every-epochs",
             str(args.log_every_epochs),
         ])
-        if args.compact_progress:
-            command.append("--compact-progress")
     if args.max_repositories is not None:
         command.extend(["--max-repositories", str(args.max_repositories)])
     if args.max_splits is not None:
@@ -176,6 +177,15 @@ def _build_command(args: argparse.Namespace, step: Dict[str, object], benchmark_
     if args.dry_run:
         command.append("--dry-run")
     return command
+
+
+def _child_env() -> Dict[str, str]:
+    env = os.environ.copy()
+    warning_filter = "ignore:.*sklearn.utils.parallel.delayed.*:UserWarning"
+    existing = env.get("PYTHONWARNINGS", "")
+    if warning_filter not in existing:
+        env["PYTHONWARNINGS"] = ",".join(item for item in [existing, warning_filter] if item)
+    return env
 
 
 def _run_row(step: Dict[str, object], status: str, return_code: int) -> Dict[str, object]:
