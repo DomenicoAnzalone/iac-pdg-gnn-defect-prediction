@@ -70,7 +70,10 @@ def main() -> None:
         command = _build_command(args, step, benchmark_root)
         print(" ".join(command), flush=True)
         started_at = datetime.now().isoformat(timespec="seconds")
-        completed = subprocess.run(command, cwd=Path.cwd(), env=_child_env())
+        stderr_path = run_dir / "logs" / "stderr.log"
+        stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        with stderr_path.open("a", encoding="utf-8") as stderr_file:
+            completed = subprocess.run(command, cwd=Path.cwd(), env=_child_env(), stderr=stderr_file)
         return_code = int(completed.returncode)
         status = "dry_run" if args.dry_run and return_code == 0 else "completed" if return_code == 0 else "failed"
         row = _run_row(step, status=status, return_code=return_code)
@@ -80,6 +83,7 @@ def main() -> None:
         _write_summary(summary_dir, rows)
         if return_code != 0:
             print(f"Benchmark stopped after failed run: {step['run_name']}", flush=True)
+            print(f"stderr saved to: {stderr_path}", flush=True)
             sys.exit(return_code)
 
     _write_summary(summary_dir, rows)
