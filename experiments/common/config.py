@@ -100,7 +100,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--log-level", default=None)
     parser.add_argument("--log-every-epochs", type=int)
     parser.add_argument("--compact-progress", action="store_true")
-    parser.add_argument("--feature-selection", choices=["none", "variance_threshold", "rfe", "rfecv"])
+    parser.add_argument("--feature-selection", choices=["none", "variance_threshold", "rfe", "rfecv", "validation_rfe"])
 
 
 def apply_common_overrides(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
