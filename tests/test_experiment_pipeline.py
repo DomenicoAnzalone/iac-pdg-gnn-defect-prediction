@@ -5,10 +5,13 @@ from pathlib import Path
 import pandas as pd
 
 from experiments.common.balancing import balance_dataframe
+from experiments.common.config import load_config
 from experiments.common.data_loading import filter_common_valid_samples, load_dataset
 from experiments.common.feature_sets import PDG_METRICS, e1_features, e2_features
+from experiments.common.preprocessing import TabularPreprocessor
 from experiments.common.splitting import assert_no_overlap, create_walk_forward_splits, materialize_split
 from experiments.e3_gnn.graph_data import GraphDataBuilder
+from experiments.run_full_benchmark import build_parser as build_benchmark_parser
 
 
 DATASET = Path("datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv")
@@ -58,3 +61,101 @@ def test_graphml_batch_loads():
     assert data
     assert data[0].x.shape[0] >= 3
     assert data[0].edge_index.shape[0] == 2
+
+
+def test_validation_rfe_selects_features_from_validation():
+    train = pd.DataFrame({
+        "good": [0, 0, 1, 1, 0, 1],
+        "noise": [0, 1, 0, 1, 1, 0],
+    })
+    val = pd.DataFrame({
+        "good": [0, 1, 0, 1],
+        "noise": [1, 1, 0, 0],
+    })
+    test = val.copy()
+    preprocessor = TabularPreprocessor(
+        ["good", "noise"],
+        feature_selection="validation_rfe",
+        scaler="none",
+        rfecv_step=1,
+        seed=42,
+        n_jobs=1,
+    )
+    _, _, _, manifest = preprocessor.fit_transform(
+        train,
+        val,
+        test,
+        y_train=pd.Series([0, 0, 1, 1, 0, 1]).to_numpy(),
+        y_val=pd.Series([0, 1, 0, 1]).to_numpy(),
+    )
+    assert manifest["used_features"] == ["good"]
+    details = manifest["feature_selection_details"]
+    assert details["method"] == "validation_rfe"
+    assert details["selection_source"] == "validation"
+
+
+def test_validation_rfe_does_not_use_test_partition_for_selection():
+    train = pd.DataFrame({
+        "good": [0, 0, 1, 1, 0, 1],
+        "noise": [0, 1, 0, 1, 1, 0],
+    })
+    val = pd.DataFrame({
+        "good": [0, 1, 0, 1],
+        "noise": [1, 1, 0, 0],
+    })
+    y_train = pd.Series([0, 0, 1, 1, 0, 1]).to_numpy()
+    y_val = pd.Series([0, 1, 0, 1]).to_numpy()
+    first_test = pd.DataFrame({"good": [0, 1], "noise": [0, 1]})
+    second_test = pd.DataFrame({"good": [999, -999], "noise": [999, -999]})
+
+    def selected_features(test_df: pd.DataFrame) -> list[str]:
+        preprocessor = TabularPreprocessor(
+            ["good", "noise"],
+            feature_selection="validation_rfe",
+            scaler="none",
+            rfecv_step=1,
+            seed=42,
+            n_jobs=1,
+        )
+        _, _, _, manifest = preprocessor.fit_transform(train, val, test_df, y_train=y_train, y_val=y_val)
+        return manifest["used_features"]
+
+    assert selected_features(first_test) == selected_features(second_test)
+
+
+def test_validation_rfe_falls_back_when_mcc_is_undefined():
+    train = pd.DataFrame({
+        "good": [0, 0, 1, 1, 0, 1],
+        "noise": [0, 1, 0, 1, 1, 0],
+    })
+    val = pd.DataFrame({
+        "good": [0, 0, 0, 0],
+        "noise": [1, 1, 0, 0],
+    })
+    preprocessor = TabularPreprocessor(
+        ["good", "noise"],
+        feature_selection="validation_rfe",
+        scaler="none",
+        rfecv_step=1,
+        seed=42,
+        n_jobs=1,
+    )
+    _, _, _, manifest = preprocessor.fit_transform(
+        train,
+        val,
+        val.copy(),
+        y_train=pd.Series([0, 0, 1, 1, 0, 1]).to_numpy(),
+        y_val=pd.Series([0, 0, 0, 0]).to_numpy(),
+    )
+    details = manifest["feature_selection_details"]
+    assert details["fallback_used"] is True
+    assert details["best_validation_metric"] in {"f1", "accuracy"}
+
+
+def test_tabular_defaults_use_validation_rfe_and_e3_is_unchanged():
+    assert load_config("experiments/configs/e1_default.yaml")["feature_selection"] == "validation_rfe"
+    assert load_config("experiments/configs/e2_default.yaml")["feature_selection"] == "validation_rfe"
+    args = build_benchmark_parser().parse_args([])
+    assert args.e1_feature_selection == "validation_rfe"
+    assert args.e2_feature_selection == "validation_rfe"
+    assert args.e3_models == "gcn,graphsage,gat,gin,rgcn"

@@ -456,7 +456,7 @@ Configurazioni minime:
 
 ```text
 E1 Random Forest
-E2 Random Forest con tutte le 11 metriche PDG candidate e RFECV train-only
+E2 Random Forest con tutte le 11 metriche PDG candidate e feature selection scelta sulla validation
 E3 GraphSAGE
 ```
 
@@ -924,14 +924,14 @@ Questo test serve a verificare:
 | Bilanciamento | `random_oversampling`, solo training set |
 | Scaler | `standard` |
 | Seed | `42` |
-| E1 feature selection | `none` |
+| E1 feature selection | `validation_rfe` nel benchmark aggiornato |
 | E2 metriche PDG | `all` |
-| E2 feature selection | `rfecv` train-only |
+| E2 feature selection | `validation_rfe` nel benchmark aggiornato |
 
 ### Comando
 
 ```bash
-python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix tabular_rf_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection none --e2-feature-selection rfecv --seed 42
+python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix tabular_rf_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection validation_rfe --e2-feature-selection validation_rfe --seed 42
 ```
 
 Output attesi:
@@ -950,7 +950,7 @@ Entrambe le run sono terminate correttamente. E1 ed E2 usano gli stessi 1.706 sp
 | Esperimento | Modello | Feature selection | MCC | AUC-PR | AUC-ROC | Precision | Recall | F1 | Accuracy |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
 | E1 | Random Forest | `none` | 0,580 | 0,794 | 0,886 | 0,649 | 0,866 | 0,742 | 0,784 |
-| E2 | Random Forest | `rfecv` | 0,606 | 0,782 | 0,883 | 0,663 | 0,881 | 0,756 | 0,797 |
+| E2 | Random Forest | `rfecv` nella run storica | 0,606 | 0,782 | 0,883 | 0,663 | 0,881 | 0,756 | 0,797 |
 
 Confusion matrix pooled:
 
@@ -987,9 +987,9 @@ Il confronto split-by-split conferma che E2 migliora alcune metriche di classifi
 | F1 | 1.706 | +0,007 | 368 | 291 | 1.047 | 2,03e-02 |
 | Accuracy | 1.706 | +0,009 | 362 | 276 | 1.068 | 1,10e-03 |
 
-### Feature PDG selezionate da RFECV
+### Feature PDG selezionate da RFECV nella run storica
 
-Le 11 metriche PDG sono state candidate in E2. RFECV le ha selezionate con frequenze diverse:
+Le 11 metriche PDG sono state candidate in E2 nella run storica. RFECV le ha selezionate con frequenze diverse:
 
 | Metrica PDG | Split in cui è selezionata |
 |---|---:|
@@ -1011,11 +1011,11 @@ Questa distribuzione conferma che non tutte le metriche PDG hanno lo stesso cont
 
 E2 è considerato utile se migliora E1 soprattutto su MCC pooled e AUC-PR pooled senza aumentare eccessivamente i falsi positivi. Il confronto principale deve usare metriche pooled; le metriche per split e per repository restano diagnostiche.
 
-Se E2 migliora E1, si può procedere a estendere E1/E2 agli altri classificatori classici. Se E2 non migliora o peggiora, bisogna analizzare il feature manifest RFECV per capire se le metriche PDG vengono effettivamente selezionate o se introducono rumore.
+Se E2 migliora E1, si può procedere a estendere E1/E2 agli altri classificatori classici. Nel benchmark aggiornato, se E2 non migliora o peggiora, bisogna analizzare il feature manifest `validation_rfe` per capire se le metriche PDG vengono effettivamente selezionate o se introducono rumore.
 
 ### Decisione
 
-E2 migliora E1 sulle metriche di classificazione principali: MCC, precision, recall, F1 e accuracy. Inoltre riduce sia falsi positivi sia falsi negativi. Questo suggerisce che le metriche PDG aggregate aggiungono informazione utile quando sono selezionate in modo train-only tramite RFECV.
+La run storica E2 migliora E1 sulle metriche di classificazione principali: MCC, precision, recall, F1 e accuracy. Inoltre riduce sia falsi positivi sia falsi negativi. Dopo la revisione metodologica richiesta, questi risultati vanno rigenerati usando `validation_rfe` sia per E1 sia per E2.
 
 Il risultato non è però uniforme: E2 peggiora leggermente AUC-PR e AUC-ROC. L'interpretazione prudente è che le metriche PDG aiutano la decisione finale del Random Forest, ma non migliorano il ranking probabilistico complessivo. Questa distinzione va riportata nella tesi.
 
@@ -1057,7 +1057,7 @@ experiments/run_full_benchmark.py
 Esegue in sequenza:
 
 - E1 con `decision_tree`, `logistic_regression`, `naive_bayes`, `random_forest`, `svm`;
-- E2 con gli stessi cinque modelli, tutte le 11 metriche PDG candidate e RFECV train-only;
+- E2 con gli stessi cinque modelli, tutte le 11 metriche PDG candidate e `validation_rfe`;
 - E3 con `gcn`, `graphsage`, `gat`, `gin`, `rgcn`.
 
 Comando:

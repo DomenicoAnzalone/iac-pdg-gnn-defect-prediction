@@ -95,7 +95,7 @@ Le 11 metriche PDG considerate sono:
 | `directFanOut` | Dipendenze dirette in uscita |
 | `indirectFanOut` | Dipendenze indirette in uscita |
 
-Il lavoro precedente mostra che le metriche PDG possono essere utilizzate sia isolatamente sia insieme alle metriche già presenti nel dataset RADON. La RQ1 della tesi di Iuliano evidenzia anche che le 11 metriche non hanno lo stesso peso predittivo: RFECV seleziona in mediana quattro feature ottimali e indica come predittori più ricorrenti `maxPdgVertices`, `verticesCount`, `edgesToVerticesRatio` ed `edgesCount`. Nel progetto corrente questa osservazione motiva l'uso della feature selection, ma non impone a priori lo stesso sottoinsieme: E2 usa tutte le 11 metriche PDG come candidate e applica RFECV soltanto sul training set di ogni split.
+Il lavoro precedente mostra che le metriche PDG possono essere utilizzate sia isolatamente sia insieme alle metriche già presenti nel dataset RADON. La RQ1 della tesi di Iuliano evidenzia anche che le 11 metriche non hanno lo stesso peso predittivo: RFECV seleziona in mediana quattro feature ottimali e indica come predittori più ricorrenti `maxPdgVertices`, `verticesCount`, `edgesToVerticesRatio` ed `edgesCount`. Nel progetto corrente questa osservazione motiva l'uso della feature selection, ma non impone a priori lo stesso sottoinsieme: E1 ed E2 usano feature candidate derivate dal rispettivo feature pool, apprendono il ranking solo sul training set di ogni split e usano il validation set per scegliere quante feature mantenere.
 
 ### 3.3 Estensione proposta: classificazione graph-level con GNN
 
@@ -403,7 +403,7 @@ datasets/ansible-pdg-defect-dataset/final/v2026-06-06/manifest.json
 | Esperimento | Rappresentazione di input | Famiglia di modelli | Scopo |
 |---|---|---|---|
 | E1 | Metriche tabellari non-PDG | Classificatori classici | Stabilire la baseline sul dataset comune |
-| E2 | Metriche tabellari non-PDG + 11 metriche PDG candidate | Classificatori classici | Misurare il valore aggiunto delle metriche PDG con feature selection train-only |
+| E2 | Metriche tabellari non-PDG + 11 metriche PDG candidate | Classificatori classici | Misurare il valore aggiunto delle metriche PDG con feature selection scelta sulla validation |
 | E3 | PDG file-level con feature di nodi e archi | GNN graph-level | Valutare il valore della struttura completa del grafo |
 
 ### 6.1 Esperimento 1: metriche tabellari non-PDG
@@ -438,15 +438,15 @@ directFanOut
 indirectFanOut
 ```
 
-Le metriche PDG vengono trattate come feature candidate. La pipeline applica RFECV, oppure RFE se configurato, usando soltanto il training set di ogni split. Validation e test non partecipano alla selezione delle feature. In questo modo la selezione resta data-driven sul dataset corrente e non deriva automaticamente dal sottoinsieme trovato nel lavoro precedente.
+Le metriche PDG vengono trattate come feature candidate. La pipeline tabellare usa di default `validation_rfe`: il ranking dei candidati viene appreso soltanto sul training set di ogni split, il validation set sceglie il numero di feature da mantenere e il test set resta escluso dalla selezione. RFECV e RFE restano configurazioni disponibili per analisi secondarie, ma il benchmark aggiornato usa la validation in modo esplicito per E1 ed E2.
 
 La differenza tra E1 ed E2 deve essere limitata al feature set. Split, campioni, preprocessing, bilanciamento, ricerca degli iperparametri e metriche di valutazione devono restare invariati.
 
 Questo esperimento risponde direttamente alla domanda: le metriche PDG aggregate aggiungono informazione predittiva rispetto alle metriche già disponibili?
 
-Una prima run comune con Random Forest ha confrontato E1 ed E2 sugli stessi 1.706 split e 25.062 predizioni test. E2, usando tutte le 11 metriche PDG candidate e RFECV train-only, migliora E1 sulle metriche di classificazione pooled: MCC `0,606` contro `0,580`, F1 `0,756` contro `0,742`, accuracy `0,797` contro `0,784`, precision `0,663` contro `0,649` e recall `0,881` contro `0,866`. Riduce inoltre sia i falsi positivi (`4.012` contro `4.199`) sia i falsi negativi (`1.068` contro `1.203`). Il risultato non è uniforme sulle metriche di ranking: AUC-PR scende da `0,794` a `0,782` e AUC-ROC da `0,886` a `0,883`. L'interpretazione prudente è che le metriche PDG aggregate aggiungono informazione utile per la decisione finale del classificatore, ma non migliorano necessariamente il ranking probabilistico. Il benchmark finale dovrà quindi riportare entrambe le famiglie di metriche.
+Una prima run comune con Random Forest ha confrontato E1 ed E2 sugli stessi 1.706 split e 25.062 predizioni test usando la precedente configurazione RFECV train-only per E2 e nessuna feature selection per E1. Questi risultati restano utili come baseline storica, ma devono essere sostituiti nel benchmark finale aggiornato da run in cui E1 ed E2 usano entrambi `validation_rfe`.
 
-L'analisi del feature manifest E2 conferma che RFECV non seleziona tutte le metriche PDG con la stessa frequenza: `edgesToVerticesRatio`, `verticesCount`, `edgesCount` e `maxPdgVertices` sono tra le più ricorrenti, mentre `lackOfCohesion` è quasi sempre scartata. Questa evidenza supporta l'uso di tutte le 11 metriche come candidate, lasciando la selezione al training set di ogni split.
+L'analisi del feature manifest E2 della run storica conferma che le metriche PDG non hanno tutte lo stesso peso. Nel benchmark aggiornato questa evidenza supporta l'uso di tutte le 11 metriche come candidate, lasciando però la scelta finale alla validation di ogni split.
 
 ### 6.3 Esperimento 3: GNN sui PDG file-level
 
@@ -650,7 +650,7 @@ Ogni run deve salvare:
 | Caricamento e preprocessing grafi | Implementato nella pipeline finale | `experiments/e3_gnn/graph_loader.py`, `experiments/e3_gnn/graph_data.py`, `experiments/e3_gnn/feature_engineering.py` | Include GraphML/DOT, feature nodali deterministiche ed edge type |
 | Split walk-forward e bilanciamento | Centralizzati | `experiments/common/splitting.py`, `experiments/common/balancing.py` | Riutilizzati da E1, E2 ed E3 |
 | Training GNN | Implementato e configurabile | `experiments/e3_gnn/run.py`, `experiments/e3_gnn/training.py`, `experiments/e3_gnn/models.py` | Supporta GCN, GraphSAGE, GAT, GIN e R-GCN, early stopping e checkpoint; se la metrica di validation non è definibile usa la validation loss come fallback per scegliere il checkpoint |
-| Classificatori classici finali | Implementati | `experiments/e1_tabular_baseline/run.py`, `experiments/e2_tabular_pdg/run.py`, `experiments/common/classical.py` | E2 usa le 11 metriche PDG candidate con RFECV train-only |
+| Classificatori classici finali | Implementati | `experiments/e1_tabular_baseline/run.py`, `experiments/e2_tabular_pdg/run.py`, `experiments/common/classical.py` | E1 ed E2 usano feature selection validation-based; E2 aggiunge le 11 metriche PDG candidate |
 | Confronto finale e analisi statistica | Prima utility implementata | `experiments/compare_results.py` | Produce confronto descrittivo e Wilcoxon paired quando possibile |
 
 ### 8.1 Punti di forza già presenti
@@ -707,7 +707,7 @@ Attività:
 - generare un manifest degli split riutilizzabile;
 - definire il comportamento per repository con pochi commit o una sola classe;
 - centralizzare seed, validation, bilanciamento e logging;
-- definire trasformazioni train-only.
+- definire trasformazioni apprese sul training e scelte di feature selection guidate dalla validation.
 - permettere alla pipeline di ricevere un filtro di dataset derivato, ad esempio
   una soglia minima su nodi e archi, mantenendo invariati split e protocollo.
 
@@ -780,7 +780,7 @@ Il dataset finale dovrebbe contenere almeno le seguenti categorie di colonne.
 | Identificativi | `repository`, `repo_url`, `branch`, `commit`, `committed_at`, `filepath` |
 | Label | `failure_prone` |
 | Metriche non-PDG | metriche product/ICO, process e delta |
-| Metriche PDG | le 11 metriche elencate nella Sezione 3.2, usate da E2 come candidate per RFECV/RFE |
+| Metriche PDG | le 11 metriche elencate nella Sezione 3.2, usate da E2 come candidate per la feature selection validation-based |
 | Percorsi del grafo | `graphml_path`, eventuale `dot_path` |
 | Stato di estrazione | `status`, `error`, eventuali conteggi di nodi e archi |
 | Provenienza | identificativo della run RADON e della run PDG |
@@ -926,7 +926,7 @@ Mitigazione:
 | Campione | Riga identificata da `(repository, commit, filepath)` |
 | `failure_prone` | Label binaria: `1` failure-prone, `0` neutral |
 | Metriche tabellari non-PDG | Metriche product/ICO, process e delta, da definire nel feature set |
-| Metriche PDG | Le metriche aggregate derivate dal PDG; il dataset ne contiene 11 ed E2 le usa come candidate con feature selection train-only |
+| Metriche PDG | Le metriche aggregate derivate dal PDG; il dataset ne contiene 11 ed E2 le usa come candidate con feature selection scelta sulla validation |
 | PDG file-level | Grafo associato a un singolo file Ansible |
 | Esperimento | Una strategia completa di rappresentazione, modello e valutazione |
 | Split | Partizione temporale train/validation/test |

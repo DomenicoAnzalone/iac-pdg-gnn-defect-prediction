@@ -7,12 +7,15 @@ import warnings
 
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFECV, RFE, VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import make_scorer, matthews_corrcoef
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+from .evaluation import compute_binary_metrics
 
 
 _SKLEARN_PARALLEL_WARNING = r".*sklearn\.utils\.parallel\.delayed.*"
@@ -41,6 +44,7 @@ class TabularPreprocessor:
     rfecv_step: int | float = 1
     rfecv_min_features_to_select: int = 1
     rfe_n_features_to_select: int | None = None
+    model_selection_scoring: str = "mcc"
 
     def fit_transform(
         self,
@@ -48,6 +52,7 @@ class TabularPreprocessor:
         validation_df: pd.DataFrame,
         test_df: pd.DataFrame,
         y_train: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, object]]:
         X_train = _numeric_frame(train_df, self.feature_columns)
         X_val = _numeric_frame(validation_df, self.feature_columns)
@@ -94,13 +99,14 @@ class TabularPreprocessor:
             X_val_np = scaler_obj.transform(X_val_np)
             X_test_np = scaler_obj.transform(X_test_np)
 
-        if self.feature_selection in {"rfecv", "rfe"} and X_train_np.shape[1] > 0:
+        if self.feature_selection in {"rfecv", "rfe", "validation_rfe"} and X_train_np.shape[1] > 0:
             X_train_np, X_val_np, X_test_np, feature_names, selection_removed, selection_details = self._fit_feature_selector(
                 X_train_np,
                 X_val_np,
                 X_test_np,
                 feature_names,
                 y_train,
+                y_val,
             )
             removed.extend(selection_removed)
         else:
@@ -124,6 +130,7 @@ class TabularPreprocessor:
         X_test: np.ndarray,
         feature_names: List[str],
         y_train: np.ndarray | None,
+        y_val: np.ndarray | None,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[str], List[Dict[str, str]], Dict[str, object]]:
         if y_train is None or len(set(y_train.astype(int).tolist())) < 2:
             return X_train, X_val, X_test, feature_names, [], {
@@ -139,6 +146,17 @@ class TabularPreprocessor:
         selector_name = self.feature_selection
         details: Dict[str, object] = {"status": "applied", "method": selector_name}
         try:
+            if selector_name == "validation_rfe":
+                return self._fit_validation_rfe(
+                    estimator,
+                    X_train,
+                    X_val,
+                    X_test,
+                    feature_names,
+                    y_train,
+                    y_val,
+                    details,
+                )
             if selector_name == "rfecv":
                 class_counts = np.bincount(y_train.astype(int))
                 positive_counts = class_counts[class_counts > 0]
@@ -187,6 +205,95 @@ class TabularPreprocessor:
             details["reason"] = f"{selector_name}_failed:{type(exc).__name__}:{exc}"
             return X_train, X_val, X_test, feature_names, [], details
 
+    def _fit_validation_rfe(
+        self,
+        estimator: RandomForestClassifier,
+        X_train: np.ndarray,
+        X_val: np.ndarray,
+        X_test: np.ndarray,
+        feature_names: List[str],
+        y_train: np.ndarray,
+        y_val: np.ndarray | None,
+        details: Dict[str, object],
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[str], List[Dict[str, str]], Dict[str, object]]:
+        if y_val is None or len(y_val) == 0:
+            details.update({
+                "status": "skipped",
+                "reason": "missing_validation_labels",
+            })
+            return X_train, X_val, X_test, feature_names, [], details
+
+        selector = RFE(
+            estimator=estimator,
+            n_features_to_select=1,
+            step=self.rfecv_step,
+        )
+        selector.fit(X_train, y_train)
+        ranking = np.asarray(selector.ranking_, dtype=int)
+        candidate_counts = _candidate_feature_counts(
+            X_train.shape[1],
+            self.rfecv_step,
+            int(self.rfecv_min_features_to_select),
+        )
+        scoring_order = _validation_scoring_order(self.model_selection_scoring)
+        best: Dict[str, object] | None = None
+        evaluated: List[Dict[str, object]] = []
+        ranked_indices = np.argsort(ranking, kind="stable")
+        for count in candidate_counts:
+            mask = np.zeros(X_train.shape[1], dtype=bool)
+            mask[ranked_indices[:count]] = True
+            selected_count = int(mask.sum())
+            if selected_count == 0:
+                continue
+            candidate = clone(estimator)
+            candidate.fit(X_train[:, mask], y_train)
+            y_pred = candidate.predict(X_val[:, mask]).astype(int)
+            y_score = _scores(candidate, X_val[:, mask], y_pred)
+            metrics = compute_binary_metrics(y_val.astype(int), y_pred, y_score)
+            score_metric, score = _first_defined_metric(metrics, scoring_order)
+            row = {
+                "candidate_feature_count": selected_count,
+                "score_metric": score_metric,
+                "validation_score": score,
+            }
+            evaluated.append(row)
+            if score == score and (best is None or float(score) > float(best["validation_score"])):
+                best = row | {"mask": mask}
+
+        details["candidate_feature_counts"] = [row["candidate_feature_count"] for row in evaluated]
+        details["validation_scoring_order"] = scoring_order
+        if best is None:
+            details.update({
+                "status": "skipped",
+                "reason": "no_defined_validation_score",
+            })
+            return X_train, X_val, X_test, feature_names, [], details
+
+        best_mask = np.asarray(best["mask"], dtype=bool)
+        kept_features = [feature for feature, keep in zip(feature_names, best_mask) if keep]
+        removed = [
+            {"feature": feature, "reason": "removed_by_validation_rfe"}
+            for feature, keep in zip(feature_names, best_mask)
+            if not keep
+        ]
+        details.update({
+            "selected_feature_count": len(kept_features),
+            "removed_feature_count": len(removed),
+            "best_validation_metric": best["score_metric"],
+            "best_validation_score": best["validation_score"],
+            "fallback_used": best["score_metric"] != self.model_selection_scoring,
+            "ranking_source": "training_only_rfe",
+            "selection_source": "validation",
+        })
+        return (
+            X_train[:, best_mask],
+            X_val[:, best_mask],
+            X_test[:, best_mask],
+            kept_features,
+            removed,
+            details,
+        )
+
 
 def _numeric_frame(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     series = {
@@ -194,3 +301,54 @@ def _numeric_frame(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
         for col in columns
     }
     return pd.DataFrame(series, index=df.index)
+
+
+def _candidate_feature_counts(feature_count: int, step: int | float, min_features: int) -> List[int]:
+    minimum = max(1, min(int(min_features), feature_count))
+    if isinstance(step, float) and 0 < step < 1:
+        stride = max(1, int(np.ceil(feature_count * step)))
+    else:
+        stride = max(1, int(step))
+    counts = list(range(minimum, feature_count + 1, stride))
+    if feature_count not in counts:
+        counts.append(feature_count)
+    return sorted(set(counts))
+
+
+def _validation_scoring_order(primary: str) -> List[str]:
+    order = [primary, "f1", "accuracy"]
+    result: List[str] = []
+    for metric in order:
+        if metric and metric not in result:
+            result.append(metric)
+    return result
+
+
+def _first_defined_metric(metrics: Dict[str, object], scoring_order: List[str]) -> Tuple[str, float]:
+    for metric in scoring_order:
+        value = metrics.get(metric, np.nan)
+        try:
+            score = float(value)
+        except Exception:
+            score = np.nan
+        if score == score:
+            return metric, score
+    return "", np.nan
+
+
+def _scores(model: object, X: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    if hasattr(model, "predict_proba"):
+        try:
+            proba = model.predict_proba(X)
+            if proba.shape[1] > 1:
+                return proba[:, 1]
+        except Exception:
+            pass
+    if hasattr(model, "decision_function"):
+        try:
+            raw = model.decision_function(X)
+            raw = np.asarray(raw, dtype=float)
+            return 1.0 / (1.0 + np.exp(-raw))
+        except Exception:
+            pass
+    return np.asarray(y_pred, dtype=float)

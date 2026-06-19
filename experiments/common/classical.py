@@ -116,12 +116,14 @@ def run_tabular_experiment(
                 rfecv_step=config.get("rfecv_step", 1),
                 rfecv_min_features_to_select=int(config.get("rfecv_min_features_to_select", 1)),
                 rfe_n_features_to_select=config.get("rfe_n_features_to_select"),
+                model_selection_scoring=config.get("model_selection_scoring", "mcc"),
             )
             X_train, X_val, X_test, feature_manifest = preprocessor.fit_transform(
                 balanced_train_df,
                 val_df,
                 test_df,
                 y_train=y_train,
+                y_val=y_val,
             )
             if X_train.shape[1] == 0:
                 logger.warning("%s/%s split=%s saltato: nessuna feature dopo preprocessing", experiment, canonical_model, split.split_id)

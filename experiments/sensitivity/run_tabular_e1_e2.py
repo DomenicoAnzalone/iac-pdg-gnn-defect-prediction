@@ -21,8 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pdg-metrics", default="all")
     parser.add_argument("--balance", default="random_oversampling", choices=["none", "random_undersampling", "random_oversampling"])
     parser.add_argument("--scaler", default="standard", choices=["none", "min-max", "standard"])
-    parser.add_argument("--e1-feature-selection", default="none", choices=["none", "variance_threshold", "rfe", "rfecv"])
-    parser.add_argument("--e2-feature-selection", default="rfecv", choices=["none", "variance_threshold", "rfe", "rfecv"])
+    parser.add_argument("--e1-feature-selection", default="validation_rfe", choices=["none", "variance_threshold", "rfe", "rfecv", "validation_rfe"])
+    parser.add_argument("--e2-feature-selection", default="validation_rfe", choices=["none", "variance_threshold", "rfe", "rfecv", "validation_rfe"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--results-root", default="experiments/results/exploratory")
     parser.add_argument("--summary-dir", default="experiments/results/exploratory/tabular_e1_e2_common")
@@ -187,7 +187,7 @@ def _render_markdown(summary: pd.DataFrame) -> str:
         "# E1/E2 Tabular Common-Setup Test",
         "",
         "Ogni riga corrisponde a una run tabellare eseguita con la configurazione comune fissata nella fase esplorativa.",
-        "E1 usa solo feature tabellari non-PDG. E2 usa le stesse feature più le 11 metriche PDG candidate e, di default, RFECV train-only.",
+        "E1 usa feature tabellari non-PDG con feature selection scelta sulla validation. E2 usa le stesse feature più le 11 metriche PDG candidate con la stessa procedura validation-based.",
         "",
         table,
         "",
