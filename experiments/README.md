@@ -44,7 +44,7 @@ Validation e test non vengono mai bilanciati. Imputation, scaling e feature filt
 
 ## Preprocessing
 
-E1/E2 usano median imputation, rimozione opzionale delle feature costanti, scaling configurabile (`none`, `min-max`, `standard`) e feature selection configurabile (`none`, `variance_threshold`, `rfe`, `rfecv`). E1 esclude identificativi, label, path dei grafi, colonne ausiliarie sulla dimensione del grafo e metriche PDG. E2 aggiunge di default tutte le 11 metriche PDG come candidate e usa RFECV train-only per selezionare le feature più utili in ogni split. Gli alias `top4` e `top5` restano disponibili per analisi secondarie.
+E1/E2 usano median imputation, rimozione opzionale delle feature costanti, scaling configurabile (`none`, `min-max`, `standard`) e feature selection configurabile (`none`, `variance_threshold`, `rfe`, `rfecv`, `validation_rfe`). Di default entrambi usano `validation_rfe`: il ranking dei candidati viene appreso solo sul training set, mentre il validation set sceglie quante feature mantenere. Il test set resta escluso dalla selezione e viene usato solo per la valutazione finale. E1 esclude identificativi, label, path dei grafi, colonne ausiliarie sulla dimensione del grafo e metriche PDG. E2 aggiunge tutte le 11 metriche PDG come candidate. Gli alias `top4` e `top5` restano disponibili per analisi secondarie.
 
 E3 carica GraphML con parsing deterministico tramite NetworkX e crea feature nodali per indicatore di task, gradi, tipo di nodo, semplici feature testuali della label, numero di attributi e presenza di informazioni di posizione. Crea `edge_type` per R-GCN e ignora gli edge type nei modelli che non li usano. Lo scaling delle node feature viene appreso solo sui grafi di training.
 
@@ -153,7 +153,7 @@ python -m experiments.e1_tabular_baseline.run --config experiments/configs/e1_de
 E2:
 
 ```bash
-python -m experiments.e2_tabular_pdg.run --config experiments/configs/e2_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-name e2_pdg_all_rfecv --pdg-metrics all --models random_forest,svm,logistic_regression --balance random_oversampling --scaler standard --seed 42
+python -m experiments.e2_tabular_pdg.run --config experiments/configs/e2_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-name e2_pdg_all_validation_rfe --pdg-metrics all --models random_forest,svm,logistic_regression --balance random_oversampling --scaler standard --seed 42
 ```
 
 E3:
@@ -167,7 +167,7 @@ python -m experiments.e3_gnn.run --config experiments/configs/e3_default.yaml --
 Il benchmark completo esegue in sequenza:
 
 - E1 con `decision_tree`, `logistic_regression`, `naive_bayes`, `random_forest`, `svm`;
-- E2 con gli stessi cinque classificatori, tutte le 11 metriche PDG candidate e RFECV train-only;
+- E2 con gli stessi cinque classificatori, tutte le 11 metriche PDG candidate e `validation_rfe`;
 - E3 con `gcn`, `graphsage`, `gat`, `gin`, `rgcn`.
 
 Comando principale:
@@ -342,14 +342,14 @@ Dopo aver fissato la configurazione comune dalla fase esplorativa E3, si può la
 
 - E1: feature tabellari non-PDG;
 - E2: stesse feature di E1 più tutte le 11 metriche PDG candidate;
-- E2 usa RFECV train-only di default;
+- E1 ed E2 usano `validation_rfe` di default;
 - il bilanciamento è `random_oversampling`, solo sul training set;
 - soglia grafi `3/2`, così E1/E2 restano sul dataset comune usato da E3.
 
 Comando completo:
 
 ```bash
-python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix tabular_rf_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection none --e2-feature-selection rfecv --seed 42
+python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix tabular_rf_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection validation_rfe --e2-feature-selection validation_rfe --seed 42
 ```
 
 Output principali:
@@ -369,7 +369,7 @@ experiments/results/exploratory/tabular_rf_common_e2/
 Smoke test rapido:
 
 ```bash
-python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix smoke_tabular_rf_common --summary-dir experiments/results/exploratory/smoke_tabular_e1_e2_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection none --e2-feature-selection rfecv --seed 42 --max-repositories 1 --max-splits 2 --max-samples 1500
+python -m experiments.sensitivity.run_tabular_e1_e2 --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-prefix smoke_tabular_rf_common --summary-dir experiments/results/exploratory/smoke_tabular_e1_e2_common --models random_forest --pdg-metrics all --balance random_oversampling --scaler standard --e1-feature-selection validation_rfe --e2-feature-selection validation_rfe --seed 42 --max-repositories 1 --max-splits 2 --max-samples 1500
 ```
 
 Se una run esiste già e vuoi rigenerare solo il riepilogo, aggiungi:
@@ -380,6 +380,6 @@ Se una run esiste già e vuoi rigenerare solo il riepilogo, aggiungi:
 
 ## Limiti Noti
 
-- E2 usa tutte le 11 metriche PDG come candidate e RFECV come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.
+- E1 ed E2 usano `validation_rfe` come default; questo può rendere le run tabellari più lente rispetto alla modalità senza feature selection.
 - Il confronto statistico include al momento sintesi descrittive e Wilcoxon paired; Friedman/Nemenyi può essere aggiunto usando la tabella per split già salvata.
 - La pipeline finale per E1/E2/E3 è sotto `experiments/`; non dipende da una cartella legacy esterna.
