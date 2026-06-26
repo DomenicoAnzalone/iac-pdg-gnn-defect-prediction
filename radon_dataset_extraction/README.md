@@ -13,7 +13,7 @@ Il progetto contiene due pipeline distinte ma compatibili:
 
 La discovery serve a costruire in modo riproducibile una lista ampia di
 candidate. La pipeline RADON resta la fase di validazione effettiva: una
-repository scoperta automaticamente non e considerata utile a priori, ma solo se
+repository scoperta automaticamente non è considerata utile a priori, ma solo se
 produce un dataset valido e supera i filtri finali.
 
 ## Struttura
@@ -34,7 +34,7 @@ produce un dataset valido e supera i filtri finali.
 La pipeline va eseguita tramite Docker. In questo modo usa Python 3.8 dentro al
 container e non dipende dalla versione di Python installata sul sistema.
 
-La cartella `output/` viene creata automaticamente durante l'esecuzione ed e
+La cartella `output/` viene creata automaticamente durante l'esecuzione ed è
 ignorata da Git.
 
 ## Build Docker
@@ -55,8 +55,8 @@ docker build -t radon-ansible-pipeline .
 
 ## Pipeline 1: Discovery GitHub
 
-La discovery interroga GitHub Search API usando piu strategie, non una singola
-query. L'obiettivo e trovare molte repository candidate che nei metadata
+La discovery interroga GitHub Search API usando più strategie, non una singola
+query. L'obiettivo è trovare molte repository candidate che nei metadata
 sembrano collegate ad Ansible.
 
 Passaggi principali:
@@ -67,8 +67,8 @@ Passaggi principali:
    `master`;
 4. esclude repository archiviate, disabilitate, troppo poco pertinenti o
    probabilmente didattiche/generiche;
-5. deduplica le repository trovate da piu query usando `full_name`;
-6. assegna un punteggio di priorita basato su stelle, fork, recency, topic e
+5. deduplica le repository trovate da più query usando `full_name`;
+6. assegna un punteggio di priorità basato su stelle, fork, recency, topic e
    numero di strategie abbinate;
 7. genera il file `repo_url,branch` compatibile con la pipeline RADON;
 8. salva report documentali sulle repository selezionate, escluse e sui criteri
@@ -93,7 +93,7 @@ La discovery esclude, quando possibile:
   `awesome`, `demo`;
 - repository senza segnali Ansible chiari nei metadata disponibili.
 
-Il filtro non e volutamente troppo aggressivo. La discovery produce candidate
+Il filtro non è volutamente troppo aggressivo. La discovery produce candidate
 plausibili; la pipeline RADON decide poi quali repository generano davvero dati
 utili.
 
@@ -144,8 +144,8 @@ https://github.com/elastic/ansible-elasticsearch,main
 - `--min-stars`: soglia minima di stelle. `0` include anche repository senza
   stelle; `1` o valori superiori riducono un po' il rumore.
 - `--max-pages`: numero massimo di pagine GitHub Search per ogni strategia.
-  Aumentarlo trova piu candidate, ma aumenta tempi e consumo di rate limit.
-- `--per-page`: risultati per pagina GitHub. Il valore tipico e `100`.
+  Aumentarlo trova più candidate, ma aumenta tempi e consumo di rate limit.
+- `--per-page`: risultati per pagina GitHub. Il valore tipico è `100`.
 - `--output`: path del file `repo_url,branch` generato.
 - `--selected-report`: path del CSV con le repository selezionate e le
   motivazioni.
@@ -173,14 +173,14 @@ https://github.com/elastic/ansible-elasticsearch,main
 
 ## Pipeline 2: RADON
 
-La pipeline RADON e la pipeline gia presente nel progetto. Prende in input un
+La pipeline RADON è la pipeline già presente nel progetto. Prende in input un
 file con una repository per riga:
 
 ```text
 repo_url,branch
 ```
 
-Il file puo essere:
+Il file può essere:
 
 - una lista manuale, ad esempio `input_repos_mixed_final.txt`;
 - il file prodotto dalla discovery, ad esempio
@@ -221,7 +221,7 @@ Ogni esecuzione salva anche metadati della run nella stessa directory:
 - `pipeline_metadata.json`: comando e parametri usati per avviare
   `run_full_pipeline.py`;
 - `run_metadata.json`: comando e parametri della fase batch RADON, snapshot
-  input usato, numero di repository totali, gia completate e ancora pending.
+  input usato, numero di repository totali, già completate e ancora pending.
 
 Questi file sono pensati per documentare la run e ricostruire facilmente il
 comando di resume o di restart pulito.
@@ -232,7 +232,7 @@ Gli stati principali in `batch_summary.csv` sono:
 - `FAILED_EXPORT`: errore durante l'export RADON;
 - `FAILED_TIMEOUT`: timeout della singola repository;
 - `EMPTY_DATASET`: export completato ma senza righe utili;
-- `SKIPPED_TOO_FEW_TAGS`: repository scartata perche ha meno di 2 tag.
+- `SKIPPED_TOO_FEW_TAGS`: repository scartata perché ha meno di 2 tag.
 
 I filtri minimi del dataset finale sono:
 
@@ -240,7 +240,7 @@ I filtri minimi del dataset finale sono:
 - almeno 20 esempi positivi;
 - almeno 20 esempi negativi.
 
-Per gli esperimenti e consigliato usare:
+Per gli esperimenti è consigliato usare:
 
 ```text
 merged_dataset_filtered.csv
@@ -292,7 +292,7 @@ docker run --rm -it `
 
 ### Parametri RADON Principali
 
-- `--input`: file `repo_url,branch` da processare. Puo essere manuale o generato
+- `--input`: file `repo_url,branch` da processare. Può essere manuale o generato
   dalla discovery.
 - `--run-name`: nome della run. Gli output finiscono in
   `output/runs/<run-name>/`.
@@ -300,16 +300,16 @@ docker run --rm -it `
   `output/runs/`.
 - `--timeout`: timeout in secondi per ogni repository. Per repository grandi
   conviene usare valori alti, ad esempio `3600`.
-- `--workers`: numero di repository processate in parallelo. Il default e `1`,
-  cioe esecuzione sequenziale.
+- `--workers`: numero di repository processate in parallelo. Il default è `1`,
+  cioè esecuzione sequenziale.
 - `--keep-clones`: conserva le repository clonate in `clone_dirs/`. Di default
-  e disattivato, quindi i cloni vengono cancellati dopo ogni repository
+  è disattivato, quindi i cloni vengono cancellati dopo ogni repository
   processata per risparmiare spazio disco.
-- `--force`: elimina la directory della run se esiste gia e rilancia tutto.
+- `--force`: elimina la directory della run se esiste già e rilancia tutto.
 
 ## Esecuzione RADON Parallela
 
-Per processare piu repository contemporaneamente, usa `--workers N`:
+Per processare più repository contemporaneamente, usa `--workers N`:
 
 ```powershell
 docker run --rm -it `
@@ -346,17 +346,17 @@ Consigli pratici:
 
 - inizia con `--workers 2` o `--workers 4`;
 - su una macchina con pochi core o poca RAM, resta su `2`;
-- su una macchina piu potente puoi provare `4`, `6` o `8`;
-- evita valori troppo alti: ogni repository puo clonare molto codice, usare CPU,
+- su una macchina più potente puoi provare `4`, `6` o `8`;
+- evita valori troppo alti: ogni repository può clonare molto codice, usare CPU,
   RAM, disco e rete;
-- una regola semplice e usare circa meta dei core logici disponibili, poi
+- una regola semplice e usare circa metà dei core logici disponibili, poi
   aumentare solo se CPU, RAM e disco restano sotto controllo.
 
 ## Arresto E Resume
 
 Per fermare una run in modo semplice, premi `Ctrl+C` nel terminale dove sta
 girando Docker. La pipeline intercetta l'interruzione, termina gli export attivi
-e mantiene in `batch_summary.csv` tutte le repository gia completate.
+e mantiene in `batch_summary.csv` tutte le repository già completate.
 
 Per riprendere, rilancia lo stesso comando con lo stesso `--run-name` e senza
 `--force`:
@@ -376,7 +376,7 @@ Durante il resume:
 
 - le repository con stato terminale in `batch_summary.csv` vengono saltate;
 - le repository mancanti vengono processate;
-- il file di input originale non viene riletto se esiste gia lo snapshot
+- il file di input originale non viene riletto se esiste già lo snapshot
   `output/runs/<run-name>/input_repos.csv`;
 - `--force` disabilita il resume, cancella la run precedente e riparte da zero.
 
@@ -401,7 +401,7 @@ docker run --rm -it `
     --force
 ```
 
-In questa modalita:
+In questa modalità:
 
 - la discovery salva i propri file in
   `output/runs/<run-name>/discovery/`;
@@ -457,10 +457,10 @@ Per run grandi conviene procedere gradualmente:
 3. lanciare una run RADON piccola;
 4. aumentare progressivamente a `500`, `800` o `1000` candidate.
 
-La discovery e relativamente veloce, ma consuma rate limit GitHub. Per run grandi
-e consigliato impostare `GITHUB_TOKEN`.
+La discovery è relativamente veloce, ma consuma rate limit GitHub. Per run grandi
+è consigliato impostare `GITHUB_TOKEN`.
 
-La fase RADON puo richiedere molto tempo: ogni repository viene interrogata,
+La fase RADON può richiedere molto tempo: ogni repository viene interrogata,
 clonata e processata separatamente. Il dataset realmente utile non coincide con
 il numero di repository scoperte, ma con le repository che risultano `SUCCESS` e
 superano il filtering finale.

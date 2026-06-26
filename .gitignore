@@ -15,3 +15,4 @@ rq4/
 !docs/THESIS_PROJECT_CONTEXT.md
 !docs/EXPERIMENT_LOG.md
 /experiments/results/*
+/tesi_latex/*

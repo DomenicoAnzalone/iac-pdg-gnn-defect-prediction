@@ -6,9 +6,9 @@
 
 ---
 
-## 1. Perche mantenere questo registro
+## 1. Perché mantenere questo registro
 
-Prima di passare al benchmark definitivo conviene usare una fase esplorativa controllata. L'obiettivo non e ancora dichiarare il modello migliore, ma capire:
+Prima di passare al benchmark definitivo conviene usare una fase esplorativa controllata. L'obiettivo non è ancora dichiarare il modello migliore, ma capire:
 
 - se la pipeline sperimentale funziona correttamente end-to-end;
 - se gli split, le metriche e gli output sono coerenti;
@@ -28,7 +28,7 @@ Gli esperimenti devono rispettare il protocollo comune definito in `docs/THESIS_
 Punti chiave:
 
 - dataset comune: `datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv`;
-- unita di analisi: `(repository, commit, filepath)`;
+- unità di analisi: `(repository, commit, filepath)`;
 - label: `failure_prone`;
 - confronto principale sul sottoinsieme con PDG valido e GraphML caricabile;
 - split within-project walk-forward;
@@ -63,7 +63,7 @@ Comando eseguito:
 python -m experiments.e3_gnn.run --config experiments/configs/e3_default.yaml --dataset datasets/ansible-pdg-defect-dataset/final/v2026-06-06/ansible-pdg-defect-dataset_v2026-06-06_final.csv --run-name e3_graphsage_full_compact --model graphsage --min-nodes 3 --min-edges 2 --balance random_oversampling --epochs 100 --batch-size 32 --seed 42 --log-every-epochs 5 --compact-progress --progress-width 100
 ```
 
-Nota: `--progress-width 100` era ancora presente nella versione del codice usata per questa run, ma riguardava solo la visualizzazione in console. Il parametro e stato successivamente rimosso per ridurre il numero di opzioni CLI.
+Nota: `--progress-width 100` era ancora presente nella versione del codice usata per questa run, ma riguardava solo la visualizzazione in console. Il parametro è stato successivamente rimosso per ridurre il numero di opzioni CLI.
 
 ### 3.2 Configurazione rilevante
 
@@ -85,7 +85,7 @@ Nota: `--progress-width 100` era ancora presente nella versione del codice usata
 | `class_weights` | `false` |
 | `device` | `auto` |
 
-Questa configurazione rappresenta una prima baseline E3 realistica: non e uno smoke test, ma non e ancora un risultato definitivo di benchmark.
+Questa configurazione rappresenta una prima baseline E3 realistica: non è uno smoke test, ma non è ancora un risultato definitivo di benchmark.
 
 ---
 
@@ -126,7 +126,7 @@ reports/run_summary.md
 | Graph exclusions | 0 |
 | Excluded samples | 0 |
 
-Conclusione: la run e coerente dal punto di vista degli output. Non risultano predizioni mancanti, duplicati o mismatch tra manifest e file predizioni.
+Conclusione: la run è coerente dal punto di vista degli output. Non risultano predizioni mancanti, duplicati o mismatch tra manifest e file predizioni.
 
 ### 4.3 Split saltati
 
@@ -145,7 +145,7 @@ Motivi degli split saltati:
 | `test_single_class` | 608 |
 | `too_few_commits` | 1 |
 
-Interpretazione: gli split saltati non indicano che meta dataset sia stato eliminato. Uno split e una finestra temporale, non una singola riga. Molti campioni coinvolti in split saltati possono comparire in split successivi come train, validation o test.
+Interpretazione: gli split saltati non indicano che metà dataset sia stato eliminato. Uno split è una finestra temporale, non una singola riga. Molti campioni coinvolti in split saltati possono comparire in split successivi come train, validation o test.
 
 ---
 
@@ -165,7 +165,7 @@ Valori da `metrics/aggregated_metrics.csv`:
 | F1 | 0.702 | 0.750 |
 | Accuracy | 0.773 | 0.833 |
 
-Questi valori suggeriscono una capacita predittiva reale, soprattutto in termini di recall. Tuttavia le medie per split vanno interpretate con cautela perche molti test set sono piccoli.
+Questi valori suggeriscono una capacità predittiva reale, soprattutto in termini di recall. Tuttavia le medie per split vanno interpretate con cautela perché molti test set sono piccoli.
 
 ### 5.2 Metriche pooled globali
 
@@ -188,11 +188,11 @@ Confusion matrix pooled:
 | Reale 0 | 11.991 | 4.120 |
 | Reale 1 | 1.418 | 7.533 |
 
-Interpretazione: il modello cattura molte istanze positive (`recall = 0.842`), ma genera anche un numero rilevante di falsi positivi. Questo comportamento puo essere accettabile in defect prediction, dove spesso e preferibile individuare molti file rischiosi, ma deve essere confrontato con E1 ed E2.
+Interpretazione: il modello cattura molte istanze positive (`recall = 0.842`), ma genera anche un numero rilevante di falsi positivi. Questo comportamento può essere accettabile in defect prediction, dove spesso è preferibile individuare molti file rischiosi, ma deve essere confrontato con E1 ed E2.
 
 ### 5.3 Distribuzione delle predizioni
 
-| Quantita | Valore |
+| Quantità | Valore |
 |---|---:|
 | Test label 0 | 16.111 |
 | Test label 1 | 8.951 |
@@ -231,7 +231,7 @@ Nessuno split ha raggiunto 90 epoche:
 epochs >= 90: 0
 ```
 
-Questo indica che `epochs=100` e un limite massimo, non il numero effettivo di epoche usate.
+Questo indica che `epochs=100` è un limite massimo, non il numero effettivo di epoche usate.
 
 ### 6.2 Underfit
 
@@ -240,7 +240,7 @@ Non emerge un underfit evidente:
 - la train loss scende in modo marcato;
 - il modello produce score non banali;
 - AUC-ROC pooled e MCC pooled sono sopra una baseline casuale;
-- la recall e alta.
+- la recall è alta.
 
 ### 6.3 Overfit
 
@@ -263,7 +263,7 @@ Interpretazione: il modello non sembra overfittare in modo generalizzato, ma alc
 
 ---
 
-## 7. Problemi e criticita emerse
+## 7. Problemi e criticità emerse
 
 ### 7.1 Test set piccoli
 
@@ -312,7 +312,7 @@ Cause osservate:
 | Predizione tutta positiva | 107 |
 | Predizione tutta negativa | 62 |
 
-Questi split non sono errori di pipeline: il modello ha prodotto una sola classe predetta, quindi MCC non e definibile.
+Questi split non sono errori di pipeline: il modello ha prodotto una sola classe predetta, quindi MCC non è definibile.
 
 Effetto sull'aggregazione:
 
@@ -404,7 +404,7 @@ Nessuna repository domina da sola il benchmark, ma le prime dieci pesano sensibi
 
 ## 8. Interpretazione complessiva
 
-La run `E3-001` e una prima baseline GNN reale e utile.
+La run `E3-001` è una prima baseline GNN reale e utile.
 
 Punti positivi:
 
@@ -424,11 +424,11 @@ Punti critici:
 - la media MCC ignorando NaN e ottimistica;
 - il modello sovra-predice `failure_prone`;
 - performance molto variabili tra repository;
-- alcuni split mostrano instabilita validation-test.
+- alcuni split mostrano instabilità validation-test.
 
 Conclusione prudente:
 
-> GraphSAGE mostra capacita predittiva reale sui PDG file-level. La performance globale e promettente, con MCC pooled circa 0.56 e recall circa 0.84. Tuttavia le metriche medie per split sono probabilmente ottimistiche a causa di test set piccoli e MCC non definiti. La run e valida come baseline E3 iniziale, ma non sufficiente da sola per conclusioni definitive.
+> GraphSAGE mostra capacità predittiva reale sui PDG file-level. La performance globale è promettente, con MCC pooled circa 0.56 e recall circa 0.84. Tuttavia le metriche medie per split sono probabilmente ottimistiche a causa di test set piccoli e MCC non definiti. La run è valida come baseline E3 iniziale, ma non sufficiente da sola per conclusioni definitive.
 
 ---
 
@@ -436,7 +436,7 @@ Conclusione prudente:
 
 ### 9.1 Migliorare il reporting
 
-La pipeline e stata aggiornata per salvare `metrics/pooled_metrics.csv` e includere colonne `pooled_*` in `aggregated_metrics.csv`. Restano da completare o consolidare:
+La pipeline è stata aggiornata per salvare `metrics/pooled_metrics.csv` e includere colonne `pooled_*` in `aggregated_metrics.csv`. Restano da completare o consolidare:
 
 - `mcc_nan_count`;
 - `mcc_mean_nan_as_zero`;
@@ -446,11 +446,11 @@ La pipeline e stata aggiornata per salvare `metrics/pooled_metrics.csv` e includ
 - metriche per bucket di `test_size`;
 - top repository per peso e performance.
 
-Motivo: il report attuale non rende abbastanza visibili instabilita e NaN.
+Motivo: il report attuale non rende abbastanza visibili instabilità e NaN.
 
 ### 9.2 Confrontare con E1 ed E2
 
-Eseguire E1 ed E2 sugli stessi split e sullo stesso dataset comune. Solo cosi si puo stabilire se la struttura del grafo aggiunge davvero valore rispetto alle feature tabellari.
+Eseguire E1 ed E2 sugli stessi split e sullo stesso dataset comune. Solo così si può stabilire se la struttura del grafo aggiunge davvero valore rispetto alle feature tabellari.
 
 Configurazioni minime:
 
@@ -469,7 +469,7 @@ seed = 7
 seed = 123
 ```
 
-Motivo: una singola run seed 42 non basta per valutare stabilita della GNN.
+Motivo: una singola run seed 42 non basta per valutare stabilità della GNN.
 
 ### 9.4 Small-graph sensitivity
 
@@ -592,9 +592,9 @@ min_nodes = 3
 min_edges = 2
 ```
 
-Motivo: non c'e evidenza che i grafi piccoli danneggino GraphSAGE; rimuoverli riduce campioni, split validi e predizioni test senza migliorare stabilmente le metriche pooled.
+Motivo: non c'è evidenza che i grafi piccoli danneggino GraphSAGE; rimuoverli riduce campioni, split validi e predizioni test senza migliorare stabilmente le metriche pooled.
 
-La soglia `8/6` puo restare come sensitivity secondaria, ma non sostituisce la soglia principale.
+La soglia `8/6` può restare come sensitivity secondaria, ma non sostituisce la soglia principale.
 
 ---
 
