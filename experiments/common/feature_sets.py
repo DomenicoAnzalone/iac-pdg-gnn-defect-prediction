@@ -69,6 +69,88 @@ PDG_AUX_COLUMNS = {
     "pdg_unique_edge_labels",
 }
 
+E1_FEATURE_FAMILIES: Dict[str, List[str]] = {
+    "process": [
+        "additions",
+        "additions_avg",
+        "additions_max",
+        "change_set_avg",
+        "change_set_max",
+        "code_churn_avg",
+        "code_churn_count",
+        "code_churn_max",
+        "commits_count",
+        "contributors_count",
+        "deletions",
+        "deletions_avg",
+        "deletions_max",
+        "highest_contributor_experience",
+        "hunks_median",
+        "minor_contributors_count",
+    ],
+    "product": [
+        "lines_blank",
+        "lines_code",
+        "lines_comment",
+        "num_conditions",
+        "num_decisions",
+        "num_keys",
+        "num_parameters",
+        "num_paths",
+        "num_tokens",
+        "num_vars",
+        "text_entropy",
+    ],
+    "iac_oriented": [
+        "avg_play_size",
+        "avg_task_size",
+        "num_authorized_key",
+        "num_block_error_handling",
+        "num_blocks",
+        "num_commands",
+        "num_deprecated_keywords",
+        "num_deprecated_modules",
+        "num_distinct_modules",
+        "num_external_modules",
+        "num_fact_modules",
+        "num_file_exists",
+        "num_file_mode",
+        "num_file_modules",
+        "num_filters",
+        "num_ignore_errors",
+        "num_import_playbook",
+        "num_import_role",
+        "num_import_tasks",
+        "num_include",
+        "num_include_role",
+        "num_include_tasks",
+        "num_include_vars",
+        "num_lookups",
+        "num_loops",
+        "num_math_operations",
+        "num_names_with_vars",
+        "num_plays",
+        "num_prompts",
+        "num_regex",
+        "num_roles",
+        "num_suspicious_comments",
+        "num_tasks",
+        "num_unique_names",
+        "num_uri",
+    ],
+}
+
+E1_FEATURE_FAMILY_ALIASES: Dict[str, str] = {
+    "process": "process",
+    "processo": "process",
+    "product": "product",
+    "prodotto": "product",
+    "iac": "iac_oriented",
+    "iac_oriented": "iac_oriented",
+    "iac-oriented": "iac_oriented",
+    "delta": "delta",
+}
+
 
 def numeric_columns(df: pd.DataFrame) -> List[str]:
     result = []
@@ -84,6 +166,33 @@ def numeric_columns(df: pd.DataFrame) -> List[str]:
 def e1_features(df: pd.DataFrame) -> List[str]:
     excluded = set(PDG_METRICS) | PDG_AUX_COLUMNS
     return [col for col in numeric_columns(df) if col not in excluded]
+
+
+def e1_feature_families(df: pd.DataFrame) -> Dict[str, List[str]]:
+    available = set(e1_features(df))
+    families = {
+        family: [feature for feature in features if feature in available]
+        for family, features in E1_FEATURE_FAMILIES.items()
+    }
+    families["delta"] = sorted(feature for feature in available if feature.startswith("delta_"))
+    return families
+
+
+def e1_features_by_family(df: pd.DataFrame, family: str) -> List[str]:
+    canonical = E1_FEATURE_FAMILY_ALIASES.get(family.strip().lower())
+    if canonical is None:
+        supported = ", ".join(sorted(E1_FEATURE_FAMILY_ALIASES))
+        raise ValueError(f"Unknown E1 feature family: {family}. Supported values: {supported}")
+    families = e1_feature_families(df)
+    return list(families[canonical])
+
+
+def unmapped_e1_features(df: pd.DataFrame) -> List[str]:
+    all_features = set(e1_features(df))
+    mapped = set()
+    for features in e1_feature_families(df).values():
+        mapped.update(features)
+    return sorted(all_features - mapped)
 
 
 def e2_features(df: pd.DataFrame, pdg_metrics: Sequence[str] | str = "all", pdg_only: bool = False) -> List[str]:

@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 import pandas as pd
-
-from .evaluation import aggregate_metrics, pooled_metrics_from_predictions
 from .reproducibility import metadata, write_json
 
 
@@ -74,6 +72,8 @@ def save_experiment_outputs(
 
 
 def rebuild_aggregates(run_dir: Path) -> None:
+    from .evaluation import aggregate_metrics
+
     per_split_path = run_dir / "metrics" / "per_split_metrics.csv"
     if not per_split_path.exists():
         return
@@ -97,6 +97,8 @@ def rebuild_aggregates(run_dir: Path) -> None:
 
 
 def _build_pooled_metrics(run_dir: Path) -> Dict[tuple[str, str], Dict[str, Any]]:
+    from .evaluation import pooled_metrics_from_predictions
+
     prediction_files = sorted((run_dir / "predictions").glob("*_predictions.csv"))
     rows: List[Dict[str, Any]] = []
     repo_rows: List[Dict[str, Any]] = []

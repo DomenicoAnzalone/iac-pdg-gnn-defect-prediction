@@ -68,6 +68,23 @@ class TabularPreprocessor:
             X_val = X_val[keep_cols]
             X_test = X_test[keep_cols]
             feature_names = keep_cols
+        if not feature_names:
+            empty_train = np.empty((len(train_df), 0))
+            empty_val = np.empty((len(validation_df), 0))
+            empty_test = np.empty((len(test_df), 0))
+            manifest = {
+                "input_features": self.feature_columns,
+                "used_features": [],
+                "removed_features": removed,
+                "scaler": self.scaler,
+                "feature_selection": self.feature_selection,
+                "feature_selection_details": {
+                    "status": "skipped",
+                    "reason": "no_features_after_all_missing_filter",
+                },
+                "imputer": "median",
+            }
+            return empty_train, empty_val, empty_test, manifest
         imputer = SimpleImputer(strategy="median")
         X_train_np = imputer.fit_transform(X_train)
         X_val_np = imputer.transform(X_val)
@@ -83,7 +100,11 @@ class TabularPreprocessor:
                 removed.extend({"feature": f, "reason": "constant_or_zero_variance"} for f, keep in zip(feature_names, kept_mask) if not keep)
                 feature_names = [f for f, keep in zip(feature_names, kept_mask) if keep]
             except ValueError:
-                pass
+                removed.extend({"feature": f, "reason": "constant_or_zero_variance"} for f in feature_names)
+                feature_names = []
+                X_train_np = np.empty((len(train_df), 0))
+                X_val_np = np.empty((len(validation_df), 0))
+                X_test_np = np.empty((len(test_df), 0))
 
         scaler_obj = None
         if self.scaler == "standard":

@@ -7,7 +7,16 @@ import pandas as pd
 from experiments.common.balancing import balance_dataframe
 from experiments.common.config import load_config
 from experiments.common.data_loading import filter_common_valid_samples, load_dataset
-from experiments.common.feature_sets import PDG_METRICS, e1_features, e2_features
+from experiments.common.feature_sets import (
+    ID_COLUMNS,
+    LABEL_COLUMNS,
+    PDG_METRICS,
+    e1_feature_families,
+    e1_features,
+    e1_features_by_family,
+    e2_features,
+    unmapped_e1_features,
+)
 from experiments.common.preprocessing import TabularPreprocessor
 from experiments.common.splitting import assert_no_overlap, create_walk_forward_splits, materialize_split
 from experiments.e3_gnn.graph_data import GraphDataBuilder
@@ -25,6 +34,26 @@ def test_dataset_schema_and_feature_sets():
     assert e1
     assert set(e1).issubset(set(e2))
     assert all(metric in e2 for metric in PDG_METRICS)
+
+
+def test_e1_feature_families_are_explicit_and_safe():
+    df = load_dataset(DATASET, max_repositories=2, max_samples=500)
+    families = e1_feature_families(df)
+    assert set(families) == {"process", "product", "iac_oriented", "delta"}
+    assert all(families[family] for family in families)
+
+    e1 = set(e1_features(df))
+    assigned = set()
+    for family, features in families.items():
+        assert e1_features_by_family(df, family) == features
+        assert set(features).issubset(e1)
+        assert not (set(features) & set(PDG_METRICS))
+        assert not (set(features) & ID_COLUMNS)
+        assert not (set(features) & LABEL_COLUMNS)
+        assigned.update(features)
+
+    assert assigned | set(unmapped_e1_features(df)) == e1
+    assert not (assigned & set(unmapped_e1_features(df)))
 
 
 def test_walk_forward_splits_no_overlap_and_temporal_order():
